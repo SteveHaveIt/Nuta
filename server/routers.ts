@@ -451,6 +451,29 @@ export const appRouter = router({
     }),
   }),
 
+  // ===== SETTINGS =====
+  settings: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return db.getSettings();
+    }),
+
+    update: protectedProcedure
+      .input(z.object({
+        siteName: z.string().optional(),
+        siteDescription: z.string().optional(),
+        loyaltyPointsPerKES: z.number().optional(),
+        loyaltyKESPerPoint: z.number().optional(),
+        affiliateCommissionRate: z.number().optional(),
+        isMaintenanceMode: z.boolean().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const updatedSettings = await db.setSettings(input);
+        return updatedSettings;
+      }),
+  }),
+
   // ===== ADMIN =====
   admin: router({
     dashboard: protectedProcedure.query(async ({ ctx }) => {

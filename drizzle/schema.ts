@@ -442,18 +442,6 @@ export const blogPosts = mysqlTable("blogPosts", {
 export type BlogPost = typeof blogPosts.$inferSelect;
 export type InsertBlogPost = typeof blogPosts.$inferInsert;
 
-// ===== SETTINGS =====
-export const settings = mysqlTable("settings", {
-  id: int("id").autoincrement().primaryKey(),
-  key: varchar("key", { length: 100 }).unique().notNull(),
-  value: text("value").notNull(),
-  type: mysqlEnum("type", ["string", "number", "boolean", "json"]).default("string"),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
-
-export type Setting = typeof settings.$inferSelect;
-export type InsertSetting = typeof settings.$inferInsert;
-
 // ===== ADMIN LOGS =====
 export const adminLogs = mysqlTable("adminLogs", {
   id: int("id").autoincrement().primaryKey(),
@@ -468,3 +456,15 @@ export const adminLogs = mysqlTable("adminLogs", {
 
 export type AdminLog = typeof adminLogs.$inferSelect;
 export type InsertAdminLog = typeof adminLogs.$inferInsert;
+
+// ===== SETTINGS =====
+export const settings = mysqlTable("settings", {
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 100 }).unique().notNull(),
+  value: text("value").notNull(),
+  type: mysqlEnum("type", ["string", "number", "boolean", "json"]).default("string"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Setting = typeof settings.$inferSelect;
+export type InsertSetting = typeof settings.$inferInsert;

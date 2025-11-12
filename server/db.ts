@@ -1,7 +1,9 @@
 import { eq, and, desc, asc, like, gte, lte } from "drizzle-orm";
+import { settings } from "../drizzle/schema";
 import { drizzle } from "drizzle-orm/mysql2";
 import { 
   InsertUser, users, products, orders, orderItems, loyaltyPoints, loyaltyHistory,
+  settings,
   affiliates, affiliateCommissions, supportTickets, supportMessages, returns,
   spinWheelRecords, guestOrders, addresses, subscriptions, subscriptionBillings,
   analytics, currencies, InsertProduct, InsertOrder, InsertOrderItem,
@@ -416,6 +418,31 @@ export async function updateAddress(addressId: number, updates: Partial<typeof a
   return db.update(addresses).set(updates).where(eq(addresses.id, addressId));
 }
 
+
+// ===== SETTINGS =====
+export async function getSettings() {
+  const db = await getDb();
+  if (!db) return {};
+  const result = await db.select().from(settings).limit(1);
+  // Return the first row, or an empty object if no settings exist
+  return result.length > 0 ? result[0] : {};
+}
+
+export async function setSettings(newSettings: Partial<typeof settings.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const currentSettings = await getSettings();
+  if (currentSettings.id) {
+    // Update existing settings (assuming only one row)
+    await db.update(settings).set(newSettings).where(eq(settings.id, currentSettings.id));
+  } else {
+    // Insert new settings
+    await db.insert(settings).values(newSettings);
+  }
+  // Return the updated settings
+  return getSettings();
+}
 
 // ===== SUBSCRIPTION HELPERS =====
 export async function createSubscription(data: InsertSubscription) {
