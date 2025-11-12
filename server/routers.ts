@@ -5,6 +5,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 import { TRPCError } from "@trpc/server";
+import { sendOrderConfirmation } from "./notificationService";
 
 // Helper function to generate order number
 function generateOrderNumber() {
@@ -168,6 +169,15 @@ export const appRouter = router({
         if (input.guestPhone) {
           await db.createGuestOrder(input.guestPhone, input.guestEmail || "", orderPin, orderNumber);
         }
+
+                // Send notifications
+        sendOrderConfirmation({
+          orderNumber,
+          totalAmount,
+          customerEmail: input.guestEmail || ctx.user?.email,
+          customerPhone: input.guestPhone,
+          customerName: ctx.user?.name,
+        });
 
         return { orderNumber, orderPin, totalAmount };
       }),
