@@ -18,7 +18,9 @@ A state-of-the-art, full-stack e-commerce platform for authentic Kenyan peanut p
 
 ## 🎯 Overview
 
-**Nuta** is a comprehensive e-commerce solution designed for the Steve Have It brand, offering:
+**Nuta** - "The taste of real Kenyan peanuts. Healthy. Honest. Homegrown."
+
+A comprehensive e-commerce solution designed for the Steve Have It brand, offering:
 
 - **E-commerce Hub**: Product catalog, shopping cart, and checkout with multiple payment methods
 - **Customer Loyalty**: Points system, spin wheel promotions, and rewards redemption

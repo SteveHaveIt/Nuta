@@ -3,8 +3,10 @@ import { drizzle } from "drizzle-orm/mysql2";
 import { 
   InsertUser, users, products, orders, orderItems, loyaltyPoints, loyaltyHistory,
   affiliates, affiliateCommissions, supportTickets, supportMessages, returns,
-  spinWheelRecords, guestOrders, addresses, InsertProduct, InsertOrder, InsertOrderItem,
-  InsertLoyaltyPoints, InsertAffiliate, InsertSupportTicket, InsertAddress
+  spinWheelRecords, guestOrders, addresses, subscriptions, subscriptionBillings,
+  analytics, currencies, InsertProduct, InsertOrder, InsertOrderItem,
+  InsertLoyaltyPoints, InsertAffiliate, InsertSupportTicket, InsertAddress,
+  InsertSubscription, InsertSubscriptionBilling, InsertAnalytics, InsertCurrency
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -412,4 +414,108 @@ export async function updateAddress(addressId: number, updates: Partial<typeof a
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db.update(addresses).set(updates).where(eq(addresses.id, addressId));
+}
+
+
+// ===== SUBSCRIPTION HELPERS =====
+export async function createSubscription(data: InsertSubscription) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(subscriptions).values(data);
+  return result;
+}
+
+export async function getUserSubscriptions(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
+}
+
+export async function getSubscription(subscriptionId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(subscriptions).where(eq(subscriptions.id, subscriptionId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateSubscription(subscriptionId: number, updates: Partial<typeof subscriptions.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(subscriptions).set(updates).where(eq(subscriptions.id, subscriptionId));
+}
+
+export async function getActiveSubscriptions() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(subscriptions).where(eq(subscriptions.status, "active"));
+}
+
+export async function createSubscriptionBilling(data: InsertSubscriptionBilling) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(subscriptionBillings).values(data);
+}
+
+export async function getSubscriptionBillings(subscriptionId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(subscriptionBillings).where(eq(subscriptionBillings.subscriptionId, subscriptionId));
+}
+
+// ===== ANALYTICS HELPERS =====
+export async function recordAnalytics(data: InsertAnalytics) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(analytics).values(data);
+}
+
+export async function getAnalyticsByDate(date: Date) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(analytics).where(eq(analytics.date, date)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getAnalyticsRange(startDate: Date, endDate: Date) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(analytics).where(and(gte(analytics.date, startDate), lte(analytics.date, endDate))).orderBy(asc(analytics.date));
+}
+
+export async function updateAnalytics(analyticsId: number, updates: Partial<typeof analytics.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(analytics).set(updates).where(eq(analytics.id, analyticsId));
+}
+
+// ===== CURRENCY HELPERS =====
+export async function createCurrency(data: InsertCurrency) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.insert(currencies).values(data);
+}
+
+export async function getCurrency(code: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(currencies).where(eq(currencies.code, code)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getAllCurrencies() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(currencies).where(eq(currencies.isActive, true));
+}
+
+export async function updateCurrency(currencyId: number, updates: Partial<typeof currencies.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(currencies).set(updates).where(eq(currencies.id, currencyId));
+}
+
+export async function updateExchangeRate(code: string, rate: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db.update(currencies).set({ exchangeRateToKES: rate }).where(eq(currencies.code, code));
 }

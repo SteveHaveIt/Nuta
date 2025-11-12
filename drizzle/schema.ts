@@ -1,24 +1,20 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json } from "drizzle-orm/mysql-core";
-import { relations } from "drizzle-orm";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, decimal, json } from "drizzle-orm/mysql-core";
 
 /**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
+ * Nuta E-Commerce Platform - Complete Database Schema
+ * Includes: Products, Orders, Customers, CRM, Marketing, Analytics, Payments
  */
+
+// ===== USERS & AUTHENTICATION =====
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
-  email: varchar("email", { length: 320 }),
+  email: varchar("email", { length: 320 }).unique(),
   phone: varchar("phone", { length: 20 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "affiliate"]).default("user").notNull(),
+  avatar: text("avatar"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -27,16 +23,24 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// Products Table
+// ===== PRODUCTS =====
 export const products = mysqlTable("products", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  price: int("price").notNull(), // Price in KES (as cents to avoid decimals)
+  shortDescription: varchar("shortDescription", { length: 500 }),
+  price: int("price").notNull(), // Price in KES (as cents)
+  originalPrice: int("originalPrice"), // For discounts
   quantity: int("quantity").notNull().default(0),
   category: varchar("category", { length: 100 }),
+  sku: varchar("sku", { length: 100 }).unique(),
   imageUrl: text("imageUrl"),
+  images: json("images"), // Array of image URLs
   featured: boolean("featured").default(false),
+  isActive: boolean("isActive").default(true),
+  healthBenefits: text("healthBenefits"), // JSON array of benefits
+  ingredients: text("ingredients"), // JSON array
+  nutritionFacts: json("nutritionFacts"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -44,19 +48,23 @@ export const products = mysqlTable("products", {
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = typeof products.$inferInsert;
 
-// Orders Table
+// ===== ORDERS =====
 export const orders = mysqlTable("orders", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId"),
-  orderNumber: varchar("orderNumber", { length: 50 }).notNull().unique(),
-  status: mysqlEnum("status", ["pending", "confirmed", "shipped", "delivered", "cancelled", "refunded"]).default("pending").notNull(),
-  totalAmount: int("totalAmount").notNull(), // In KES (cents)
-  paymentMethod: varchar("paymentMethod", { length: 50 }), // mpesa, paypal
-  paymentStatus: mysqlEnum("paymentStatus", ["pending", "completed", "failed", "refunded"]).default("pending"),
-  deliveryAddress: text("deliveryAddress"),
-  guestPhone: varchar("guestPhone", { length: 20 }),
-  guestEmail: varchar("guestEmail", { length: 320 }),
-  guestPin: varchar("guestPin", { length: 10 }),
+  orderNumber: varchar("orderNumber", { length: 50 }).unique().notNull(),
+  status: mysqlEnum("status", ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled", "refunded"]).default("pending").notNull(),
+  paymentStatus: mysqlEnum("paymentStatus", ["pending", "completed", "failed", "refunded"]).default("pending").notNull(),
+  paymentMethod: mysqlEnum("paymentMethod", ["mpesa", "paypal", "card", "bank_transfer"]),
+  totalAmount: int("totalAmount").notNull(),
+  shippingCost: int("shippingCost").default(0),
+  discountAmount: int("discountAmount").default(0),
+  taxAmount: int("taxAmount").default(0),
+  notes: text("notes"),
+  shippingAddress: json("shippingAddress").notNull(),
+  billingAddress: json("billingAddress"),
+  trackingNumber: varchar("trackingNumber", { length: 100 }),
+  estimatedDelivery: timestamp("estimatedDelivery"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -64,40 +72,81 @@ export const orders = mysqlTable("orders", {
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = typeof orders.$inferInsert;
 
-// Order Items Table
+// ===== ORDER ITEMS =====
 export const orderItems = mysqlTable("orderItems", {
   id: int("id").autoincrement().primaryKey(),
   orderId: int("orderId").notNull(),
   productId: int("productId").notNull(),
   quantity: int("quantity").notNull(),
-  price: int("price").notNull(), // Price at time of order (in cents)
+  unitPrice: int("unitPrice").notNull(),
+  totalPrice: int("totalPrice").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type OrderItem = typeof orderItems.$inferSelect;
 export type InsertOrderItem = typeof orderItems.$inferInsert;
 
-// Loyalty Points Table
+// ===== CUSTOMERS (CRM) =====
+export const customers = mysqlTable("customers", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").unique(),
+  firstName: varchar("firstName", { length: 100 }).notNull(),
+  lastName: varchar("lastName", { length: 100 }),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  segment: mysqlEnum("segment", ["vip", "regular", "inactive", "at_risk"]).default("regular"),
+  totalOrders: int("totalOrders").default(0),
+  totalSpent: int("totalSpent").default(0),
+  lastOrderDate: timestamp("lastOrderDate"),
+  preferredPaymentMethod: varchar("preferredPaymentMethod", { length: 50 }),
+  notes: text("notes"),
+  tags: json("tags"), // Array of tags
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Customer = typeof customers.$inferSelect;
+export type InsertCustomer = typeof customers.$inferInsert;
+
+// ===== CUSTOMER COMMUNICATION (CRM) =====
+export const customerCommunications = mysqlTable("customerCommunications", {
+  id: int("id").autoincrement().primaryKey(),
+  customerId: int("customerId").notNull(),
+  type: mysqlEnum("type", ["email", "sms", "whatsapp", "call", "note"]).notNull(),
+  subject: varchar("subject", { length: 255 }),
+  message: text("message").notNull(),
+  sentBy: varchar("sentBy", { length: 100 }), // admin, system, customer
+  status: mysqlEnum("status", ["sent", "delivered", "read", "failed"]).default("sent"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CustomerCommunication = typeof customerCommunications.$inferSelect;
+export type InsertCustomerCommunication = typeof customerCommunications.$inferInsert;
+
+// ===== LOYALTY POINTS =====
 export const loyaltyPoints = mysqlTable("loyaltyPoints", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().unique(),
-  points: int("points").notNull().default(0),
-  redeemedPoints: int("redeemedPoints").notNull().default(0),
-  totalEarned: int("totalEarned").notNull().default(0),
-  lastUpdated: timestamp("lastUpdated").defaultNow().onUpdateNow(),
+  totalPoints: int("totalPoints").default(0).notNull(),
+  availablePoints: int("availablePoints").default(0).notNull(),
+  redeemedPoints: int("redeemedPoints").default(0).notNull(),
+  expiredPoints: int("expiredPoints").default(0).notNull(),
+  lastUpdated: timestamp("lastUpdated").defaultNow().onUpdateNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type LoyaltyPoints = typeof loyaltyPoints.$inferSelect;
 export type InsertLoyaltyPoints = typeof loyaltyPoints.$inferInsert;
 
-// Loyalty History Table
+// ===== LOYALTY HISTORY =====
 export const loyaltyHistory = mysqlTable("loyaltyHistory", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   orderId: int("orderId"),
-  pointsEarned: int("pointsEarned").notNull().default(0),
-  pointsRedeemed: int("pointsRedeemed").notNull().default(0),
+  pointsEarned: int("pointsEarned"),
+  pointsRedeemed: int("pointsRedeemed"),
+  pointsExpired: int("pointsExpired"),
+  type: mysqlEnum("type", ["earned", "redeemed", "expired", "adjusted"]).notNull(),
   description: text("description"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -105,29 +154,36 @@ export const loyaltyHistory = mysqlTable("loyaltyHistory", {
 export type LoyaltyHistory = typeof loyaltyHistory.$inferSelect;
 export type InsertLoyaltyHistory = typeof loyaltyHistory.$inferInsert;
 
-// Spin Wheel Records Table
+// ===== SPIN WHEEL RECORDS =====
 export const spinWheelRecords = mysqlTable("spinWheelRecords", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
-  purchaseCount: int("purchaseCount").notNull(),
-  rewardAmount: int("rewardAmount").notNull(), // In KES (cents)
-  rewardStatus: mysqlEnum("rewardStatus", ["pending", "credited", "claimed"]).default("pending"),
+  eligibilityTier: mysqlEnum("eligibilityTier", ["5_purchases", "10_purchases", "20_purchases", "30_purchases"]).notNull(),
+  rewardAmount: int("rewardAmount").notNull(),
+  isFestiveMode: boolean("isFestiveMode").default(false),
+  festiveBonus: int("festiveBonus").default(0),
+  finalAmount: int("finalAmount").notNull(),
+  status: mysqlEnum("status", ["pending", "credited", "claimed"]).default("pending"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type SpinWheelRecord = typeof spinWheelRecords.$inferSelect;
 export type InsertSpinWheelRecord = typeof spinWheelRecords.$inferInsert;
 
-// Affiliates Table
+// ===== AFFILIATES =====
 export const affiliates = mysqlTable("affiliates", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull().unique(),
-  referralCode: varchar("referralCode", { length: 50 }).notNull().unique(),
-  totalEarnings: int("totalEarnings").notNull().default(0), // In KES (cents)
-  monthlyEarnings: int("monthlyEarnings").notNull().default(0),
-  rank: mysqlEnum("rank", ["Bronze", "Silver", "Gold", "Platinum"]).default("Bronze"),
-  status: mysqlEnum("status", ["pending", "approved", "suspended"]).default("pending"),
-  referralCount: int("referralCount").notNull().default(0),
+  referralCode: varchar("referralCode", { length: 50 }).unique().notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "suspended", "rejected"]).default("pending").notNull(),
+  rank: mysqlEnum("rank", ["bronze", "silver", "gold", "platinum"]).default("bronze"),
+  totalReferrals: int("totalReferrals").default(0),
+  totalCommissions: int("totalCommissions").default(0),
+  currentBalance: int("currentBalance").default(0),
+  bankAccount: json("bankAccount"), // Bank details for payouts
+  payoutEmail: varchar("payoutEmail", { length: 320 }),
+  lastPayoutDate: timestamp("lastPayoutDate"),
+  approvedAt: timestamp("approvedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -135,60 +191,70 @@ export const affiliates = mysqlTable("affiliates", {
 export type Affiliate = typeof affiliates.$inferSelect;
 export type InsertAffiliate = typeof affiliates.$inferInsert;
 
-// Affiliate Commissions Table
+// ===== AFFILIATE COMMISSIONS =====
 export const affiliateCommissions = mysqlTable("affiliateCommissions", {
   id: int("id").autoincrement().primaryKey(),
   affiliateId: int("affiliateId").notNull(),
   orderId: int("orderId").notNull(),
-  commissionAmount: int("commissionAmount").notNull(), // In KES (cents)
-  status: mysqlEnum("status", ["pending", "paid", "cancelled"]).default("pending"),
-  payoutDate: timestamp("payoutDate"),
+  referralCode: varchar("referralCode", { length: 50 }).notNull(),
+  orderAmount: int("orderAmount").notNull(),
+  commissionPercent: int("commissionPercent").notNull(),
+  baseCommission: int("baseCommission").notNull(),
+  rankBonus: int("rankBonus").default(0),
+  totalCommission: int("totalCommission").notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "paid", "cancelled"]).default("pending"),
+  paidDate: timestamp("paidDate"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type AffiliateCommission = typeof affiliateCommissions.$inferSelect;
 export type InsertAffiliateCommission = typeof affiliateCommissions.$inferInsert;
 
-// Support Tickets Table
+// ===== SUPPORT TICKETS (CRM) =====
 export const supportTickets = mysqlTable("supportTickets", {
   id: int("id").autoincrement().primaryKey(),
+  ticketNumber: varchar("ticketNumber", { length: 50 }).unique().notNull(),
   userId: int("userId"),
-  ticketNumber: varchar("ticketNumber", { length: 50 }).notNull().unique(),
+  email: varchar("email", { length: 320 }).notNull(),
   subject: varchar("subject", { length: 255 }).notNull(),
-  description: text("description"),
-  status: mysqlEnum("status", ["open", "in-progress", "resolved", "closed"]).default("open"),
+  description: text("description").notNull(),
+  category: mysqlEnum("category", ["product", "order", "payment", "delivery", "return", "general"]).notNull(),
   priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium"),
-  guestEmail: varchar("guestEmail", { length: 320 }),
-  guestPhone: varchar("guestPhone", { length: 20 }),
+  status: mysqlEnum("status", ["open", "in_progress", "waiting_customer", "resolved", "closed"]).default("open"),
+  assignedTo: int("assignedTo"), // Admin user ID
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  resolvedAt: timestamp("resolvedAt"),
 });
 
 export type SupportTicket = typeof supportTickets.$inferSelect;
 export type InsertSupportTicket = typeof supportTickets.$inferInsert;
 
-// Support Messages Table
+// ===== SUPPORT MESSAGES (CRM) =====
 export const supportMessages = mysqlTable("supportMessages", {
   id: int("id").autoincrement().primaryKey(),
   ticketId: int("ticketId").notNull(),
-  userId: int("userId"),
+  senderType: mysqlEnum("senderType", ["customer", "admin", "system"]).notNull(),
+  senderId: int("senderId"),
   message: text("message").notNull(),
-  isAdmin: boolean("isAdmin").default(false),
+  attachments: json("attachments"), // Array of attachment URLs
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type SupportMessage = typeof supportMessages.$inferSelect;
 export type InsertSupportMessage = typeof supportMessages.$inferInsert;
 
-// Returns Table
+// ===== RETURNS & REFUNDS =====
 export const returns = mysqlTable("returns", {
   id: int("id").autoincrement().primaryKey(),
+  returnNumber: varchar("returnNumber", { length: 50 }).unique().notNull(),
   orderId: int("orderId").notNull(),
-  userId: int("userId"),
-  returnNumber: varchar("returnNumber", { length: 50 }).notNull().unique(),
-  reason: text("reason"),
-  status: mysqlEnum("status", ["requested", "approved", "shipped", "received", "refunded", "rejected"]).default("requested"),
-  refundAmount: int("refundAmount"), // In KES (cents)
+  userId: int("userId").notNull(),
+  reason: varchar("reason", { length: 255 }).notNull(),
+  description: text("description"),
+  status: mysqlEnum("status", ["requested", "approved", "shipped_back", "received", "refunded", "rejected"]).default("requested"),
+  refundAmount: int("refundAmount"),
+  refundStatus: mysqlEnum("refundStatus", ["pending", "processed", "completed", "failed"]),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -196,7 +262,7 @@ export const returns = mysqlTable("returns", {
 export type Return = typeof returns.$inferSelect;
 export type InsertReturn = typeof returns.$inferInsert;
 
-// Guest Orders Table
+// ===== GUEST ORDERS =====
 export const guestOrders = mysqlTable("guestOrders", {
   id: int("id").autoincrement().primaryKey(),
   phone: varchar("phone", { length: 20 }).notNull(),
@@ -211,7 +277,7 @@ export const guestOrders = mysqlTable("guestOrders", {
 export type GuestOrder = typeof guestOrders.$inferSelect;
 export type InsertGuestOrder = typeof guestOrders.$inferInsert;
 
-// Addresses Table
+// ===== ADDRESSES =====
 export const addresses = mysqlTable("addresses", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
@@ -226,3 +292,179 @@ export const addresses = mysqlTable("addresses", {
 
 export type Address = typeof addresses.$inferSelect;
 export type InsertAddress = typeof addresses.$inferInsert;
+
+// ===== SUBSCRIPTIONS =====
+export const subscriptions = mysqlTable("subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  productId: int("productId").notNull(),
+  quantity: int("quantity").notNull(),
+  frequency: mysqlEnum("frequency", ["weekly", "biweekly", "monthly", "quarterly"]).notNull(),
+  status: mysqlEnum("status", ["active", "paused", "cancelled"]).default("active").notNull(),
+  nextBillingDate: timestamp("nextBillingDate").notNull(),
+  totalBillings: int("totalBillings").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = typeof subscriptions.$inferInsert;
+
+// ===== SUBSCRIPTION BILLINGS =====
+export const subscriptionBillings = mysqlTable("subscriptionBillings", {
+  id: int("id").autoincrement().primaryKey(),
+  subscriptionId: int("subscriptionId").notNull(),
+  orderId: int("orderId"),
+  amount: int("amount").notNull(),
+  status: mysqlEnum("status", ["pending", "completed", "failed"]).default("pending").notNull(),
+  billingDate: timestamp("billingDate").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SubscriptionBilling = typeof subscriptionBillings.$inferSelect;
+export type InsertSubscriptionBilling = typeof subscriptionBillings.$inferInsert;
+
+// ===== MARKETING CAMPAIGNS =====
+export const campaigns = mysqlTable("campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: mysqlEnum("type", ["flash_sale", "seasonal", "email", "whatsapp", "affiliate_bonus", "giveaway"]).notNull(),
+  description: text("description"),
+  discountPercent: int("discountPercent"),
+  discountAmount: int("discountAmount"),
+  startDate: timestamp("startDate").notNull(),
+  endDate: timestamp("endDate").notNull(),
+  status: mysqlEnum("status", ["draft", "active", "paused", "ended"]).default("draft"),
+  targetAudience: json("targetAudience"), // Segments, tags, etc.
+  products: json("products"), // Product IDs
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Campaign = typeof campaigns.$inferSelect;
+export type InsertCampaign = typeof campaigns.$inferInsert;
+
+// ===== COUPONS =====
+export const coupons = mysqlTable("coupons", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 50 }).unique().notNull(),
+  campaignId: int("campaignId"),
+  discountType: mysqlEnum("discountType", ["percent", "fixed"]).notNull(),
+  discountValue: int("discountValue").notNull(),
+  maxUses: int("maxUses"),
+  usedCount: int("usedCount").default(0),
+  minOrderAmount: int("minOrderAmount"),
+  validFrom: timestamp("validFrom").notNull(),
+  validUntil: timestamp("validUntil").notNull(),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Coupon = typeof coupons.$inferSelect;
+export type InsertCoupon = typeof coupons.$inferInsert;
+
+// ===== ANALYTICS =====
+export const analytics = mysqlTable("analytics", {
+  id: int("id").autoincrement().primaryKey(),
+  date: timestamp("date").notNull(),
+  totalOrders: int("totalOrders").default(0).notNull(),
+  totalRevenue: int("totalRevenue").default(0).notNull(),
+  totalCustomers: int("totalCustomers").default(0).notNull(),
+  newCustomers: int("newCustomers").default(0),
+  averageOrderValue: int("averageOrderValue").default(0).notNull(),
+  pageViews: int("pageViews").default(0),
+  uniqueVisitors: int("uniqueVisitors").default(0),
+  conversionRate: decimal("conversionRate", { precision: 5, scale: 2 }).default("0"),
+  loyaltyPointsDistributed: int("loyaltyPointsDistributed").default(0).notNull(),
+  affiliateCommissionsDistributed: int("affiliateCommissionsDistributed").default(0).notNull(),
+  topProduct: int("topProduct"),
+  topAffiliate: int("topAffiliate"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Analytics = typeof analytics.$inferSelect;
+export type InsertAnalytics = typeof analytics.$inferInsert;
+
+// ===== CURRENCIES =====
+export const currencies = mysqlTable("currencies", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 3 }).notNull().unique(),
+  symbol: varchar("symbol", { length: 5 }).notNull(),
+  name: varchar("name", { length: 50 }).notNull(),
+  exchangeRateToKES: decimal("exchangeRateToKES", { precision: 10, scale: 4 }).notNull(),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Currency = typeof currencies.$inferSelect;
+export type InsertCurrency = typeof currencies.$inferInsert;
+
+// ===== PAYMENT TRANSACTIONS =====
+export const paymentTransactions = mysqlTable("paymentTransactions", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull(),
+  userId: int("userId"),
+  amount: int("amount").notNull(),
+  currency: varchar("currency", { length: 3 }).notNull(),
+  paymentMethod: mysqlEnum("paymentMethod", ["mpesa", "paypal", "card", "bank_transfer"]).notNull(),
+  status: mysqlEnum("status", ["pending", "completed", "failed", "refunded"]).default("pending"),
+  transactionId: varchar("transactionId", { length: 100 }).unique(),
+  mpesaReference: varchar("mpesaReference", { length: 100 }),
+  paypalTransactionId: varchar("paypalTransactionId", { length: 100 }),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PaymentTransaction = typeof paymentTransactions.$inferSelect;
+export type InsertPaymentTransaction = typeof paymentTransactions.$inferInsert;
+
+// ===== BLOG POSTS =====
+export const blogPosts = mysqlTable("blogPosts", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).unique().notNull(),
+  content: text("content").notNull(),
+  excerpt: varchar("excerpt", { length: 500 }),
+  featuredImage: text("featuredImage"),
+  author: varchar("author", { length: 100 }),
+  category: varchar("category", { length: 100 }),
+  tags: json("tags"),
+  isPublished: boolean("isPublished").default(false),
+  viewCount: int("viewCount").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  publishedAt: timestamp("publishedAt"),
+});
+
+export type BlogPost = typeof blogPosts.$inferSelect;
+export type InsertBlogPost = typeof blogPosts.$inferInsert;
+
+// ===== SETTINGS =====
+export const settings = mysqlTable("settings", {
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 100 }).unique().notNull(),
+  value: text("value").notNull(),
+  type: mysqlEnum("type", ["string", "number", "boolean", "json"]).default("string"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Setting = typeof settings.$inferSelect;
+export type InsertSetting = typeof settings.$inferInsert;
+
+// ===== ADMIN LOGS =====
+export const adminLogs = mysqlTable("adminLogs", {
+  id: int("id").autoincrement().primaryKey(),
+  adminId: int("adminId").notNull(),
+  action: varchar("action", { length: 100 }).notNull(),
+  entityType: varchar("entityType", { length: 50 }),
+  entityId: int("entityId"),
+  details: json("details"),
+  ipAddress: varchar("ipAddress", { length: 50 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AdminLog = typeof adminLogs.$inferSelect;
+export type InsertAdminLog = typeof adminLogs.$inferInsert;
