@@ -37,10 +37,34 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+// Determine the API URL based on environment
+const getApiUrl = () => {
+  // In production, use the backend URL from environment variable
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // In development or when same-origin, use relative path
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return '/api/trpc';
+  }
+  
+  // For deployed environments, construct the backend URL
+  // If frontend is on nuta.onrender.com, backend is on nuta-backend.onrender.com
+  if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+    const frontendHost = window.location.hostname;
+    const backendHost = frontendHost.replace('nuta.', 'nuta-backend.');
+    return `https://${backendHost}/api/trpc`;
+  }
+  
+  // Fallback to relative path
+  return '/api/trpc';
+};
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: getApiUrl(),
       transformer: superjson,
       fetch(input, init) {
         return globalThis.fetch(input, {
