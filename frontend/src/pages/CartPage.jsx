@@ -1,11 +1,11 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react'
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 
 function CartPage() {
-  // Mock cart data - would come from state management
+  // Initial cart state (replace with global state or API later)
   const [cartItems, setCartItems] = useState([
     {
       id: 1,
@@ -23,23 +23,22 @@ function CartPage() {
       quantity: 1,
       image: 'https://images.unsplash.com/photo-1608797178974-15b35a64ede9?w=200&h=200&fit=crop'
     }
-  ])
+  ]);
 
-  const updateQuantity = (id, newQuantity) => {
-    if (newQuantity < 1) return
-    setCartItems(cartItems.map(item => 
-      item.id === id ? { ...item, quantity: newQuantity } : item
-    ))
-  }
+  // Update quantity safely
+  const updateQuantity = (id, newQty) => {
+    if (newQty < 1) return;
+    setCartItems(prev => prev.map(item => item.id === id ? { ...item, quantity: newQty } : item));
+  };
 
-  const removeItem = (id) => {
-    setCartItems(cartItems.filter(item => item.id !== id))
-  }
+  // Remove item
+  const removeItem = (id) => setCartItems(prev => prev.filter(item => item.id !== id));
 
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  const shipping = subtotal > 50 ? 0 : 5.99
-  const tax = subtotal * 0.08
-  const total = subtotal + shipping + tax
+  // Calculations
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const shipping = subtotal > 50 ? 0 : 5.99;
+  const tax = subtotal * 0.08;
+  const total = subtotal + shipping + tax;
 
   if (cartItems.length === 0) {
     return (
@@ -49,7 +48,7 @@ function CartPage() {
             <ShoppingBag className="h-24 w-24 mx-auto text-muted-foreground mb-6" />
             <h2 className="text-3xl font-bold mb-4">Your cart is empty</h2>
             <p className="text-muted-foreground mb-8">
-              Looks like you haven't added anything to your cart yet.
+              Looks like you haven't added anything yet.
             </p>
             <Link to="/products">
               <Button size="lg">Start Shopping</Button>
@@ -57,7 +56,7 @@ function CartPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -68,8 +67,8 @@ function CartPage() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {cartItems.map((item) => (
-              <Card key={item.id}>
+            {cartItems.map(item => (
+              <Card key={item.id} className="hover:shadow-lg transition-shadow duration-200">
                 <CardContent className="p-6">
                   <div className="flex gap-4">
                     <img
@@ -89,11 +88,7 @@ function CartPage() {
                             ${item.price.toFixed(2)} each
                           </p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeItem(item.id)}
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -139,14 +134,10 @@ function CartPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span className="font-medium">
-                    {shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}
-                  </span>
+                  <span className="font-medium">{shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}</span>
                 </div>
                 {shipping > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Free shipping on orders over $50
-                  </p>
+                  <p className="text-xs text-muted-foreground">Free shipping on orders over $50</p>
                 )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tax (8%)</span>
@@ -155,22 +146,16 @@ function CartPage() {
                 <div className="border-t pt-4">
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-semibold">Total</span>
-                    <span className="text-2xl font-bold text-primary">
-                      ${total.toFixed(2)}
-                    </span>
+                    <span className="text-2xl font-bold text-primary">${total.toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col gap-2">
                 <Link to="/checkout" className="w-full">
-                  <Button size="lg" className="w-full">
-                    Proceed to Checkout
-                  </Button>
+                  <Button size="lg" className="w-full">Proceed to Checkout</Button>
                 </Link>
                 <Link to="/products" className="w-full">
-                  <Button size="lg" variant="outline" className="w-full">
-                    Continue Shopping
-                  </Button>
+                  <Button size="lg" variant="outline" className="w-full">Continue Shopping</Button>
                 </Link>
               </CardFooter>
             </Card>
@@ -178,7 +163,7 @@ function CartPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default CartPage
+export default CartPage;
