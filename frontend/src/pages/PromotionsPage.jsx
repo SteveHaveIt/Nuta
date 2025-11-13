@@ -5,7 +5,7 @@ import GiveawayCard from '../components/GiveawayCard'
 import SocialContestCard from '../components/SocialContestCard'
 import { Button } from '@/components/ui/button'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/'
 
 function PromotionsPage() {
   const [giveaways, setGiveaways] = useState([])

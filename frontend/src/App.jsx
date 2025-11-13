@@ -18,7 +18,7 @@ import SpinWheel from './components/SpinWheel'
 import FlashSaleBanner from './components/FlashSaleBanner'
 import MarketingPopup from './components/MarketingPopup'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/'
 
 function App() {
   const [showSpinWheel, setShowSpinWheel] = useState(false)
