@@ -61,10 +61,10 @@ async function sendEmailNotification(data: OrderNotificationData) {
 
 // --- SMS Service (Twilio) ---
 
-const twilioClient = twilio(ENV.twilioAccountSid, ENV.twilioAuthToken);
+let twilioClient = null;\n\nif (ENV.twilioAccountSid && ENV.twilioAuthToken) {\n  twilioClient = twilio(ENV.twilioAccountSid, ENV.twilioAuthToken);\n} else {\n  console.warn("⚠️ Twilio not configured — skipping SMS service.");\n}
 
 async function sendSmsNotification(data: OrderNotificationData) {
-  if (ENV.twilioAccountSid.startsWith("ACXX") || !data.customerPhone) {
+  if (!twilioClient || !data.customerPhone || !ENV.twilioPhoneNumber) {
     console.warn("SMS notification skipped: Missing phone number or Twilio credentials.");
     return;
   }
@@ -87,7 +87,7 @@ async function sendSmsNotification(data: OrderNotificationData) {
 // --- WhatsApp Service (Twilio) ---
 
 async function sendWhatsappNotification(data: OrderNotificationData) {
-  if (ENV.twilioAccountSid.startsWith("ACXX") || !data.customerPhone) {
+  if (!twilioClient || !data.customerPhone || !ENV.twilioPhoneNumber) {
     console.warn("WhatsApp notification skipped: Missing phone number or Twilio credentials.");
     return;
   }
