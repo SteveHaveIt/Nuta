@@ -7,62 +7,79 @@ import { motion } from 'framer-motion'
 import api from '../config/api'
 
 function HomePage() {
-  const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [featuredProducts, setFeaturedProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [cartItems, setCartItems] = useState([])
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const data = await api.getProducts({ featured: 'true' });
-        setFeaturedProducts(data.products || []);
+        const data = await api.getProducts({ featured: 'true' })
+        setFeaturedProducts(data.products || [])
       } catch (error) {
-        console.error('Error fetching products:', error);
-        // Fallback to mock data
+        console.error('Error fetching products:', error)
+        // Fallback mock data
         setFeaturedProducts([
-    {
-      id: 1,
-      slug: 'creamy-peanut-butter',
-      name: 'Creamy Peanut Butter',
-      price: 12.99,
-      image: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&h=400&fit=crop',
-      rating: 4.8,
-      reviews: 124
-    },
-    {
-      id: 2,
-      slug: 'crunchy-peanut-butter',
-      name: 'Crunchy Peanut Butter',
-      price: 13.99,
-      image: 'https://images.unsplash.com/photo-1600952841320-db92ec4047ca?w=400&h=400&fit=crop',
-      rating: 4.9,
-      reviews: 98
-    },
-    {
-      id: 3,
-      slug: 'roasted-peanuts',
-      name: 'Premium Roasted Peanuts',
-      price: 8.99,
-      image: 'https://images.unsplash.com/photo-1608797178974-15b35a64ede9?w=400&h=400&fit=crop',
-      rating: 4.7,
-      reviews: 156
-    },
-    {
-      id: 4,
-      slug: 'honey-peanut-butter',
-      name: 'Honey Peanut Butter',
-      price: 14.99,
-      image: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&h=400&fit=crop',
-      rating: 4.9,
-      reviews: 87
-    }
-        ]);
+          {
+            id: 1,
+            slug: 'creamy-peanut-butter',
+            name: 'Creamy Peanut Butter',
+            price: 12.99,
+            image: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&h=400&fit=crop',
+            rating: 4.8,
+            reviews: 124
+          },
+          {
+            id: 2,
+            slug: 'crunchy-peanut-butter',
+            name: 'Crunchy Peanut Butter',
+            price: 13.99,
+            image: 'https://images.unsplash.com/photo-1600952841320-db92ec4047ca?w=400&h=400&fit=crop',
+            rating: 4.9,
+            reviews: 98
+          },
+          {
+            id: 3,
+            slug: 'roasted-peanuts',
+            name: 'Premium Roasted Peanuts',
+            price: 8.99,
+            image: 'https://images.unsplash.com/photo-1608797178974-15b35a64ede9?w=400&h=400&fit=crop',
+            rating: 4.7,
+            reviews: 156
+          },
+          {
+            id: 4,
+            slug: 'honey-peanut-butter',
+            name: 'Honey Peanut Butter',
+            price: 14.99,
+            image: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&h=400&fit=crop',
+            rating: 4.9,
+            reviews: 87
+          }
+        ])
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchProducts();
-  }, []);
+    fetchProducts()
+  }, [])
+
+  // Add to cart function
+  const addToCart = (product) => {
+    setCartItems(prev => {
+      const existing = prev.find(item => item.id === product.id)
+      if (existing) {
+        return prev.map(item =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      } else {
+        return [...prev, { ...product, quantity: 1 }]
+      }
+    })
+  }
 
   return (
     <div className="w-full">
@@ -122,52 +139,56 @@ function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product, index) => (
-              <motion.div
-                key={product.id}
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-              >
-                <Card className="group hover:shadow-lg transition-shadow duration-300">
-                  <CardHeader className="p-0">
-                    <div className="relative overflow-hidden rounded-t-lg">
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Heart className="h-4 w-4" />
+          {loading ? (
+            <div className="text-center col-span-full">Loading featured products...</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {featuredProducts.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 50 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <Card className="group hover:shadow-lg transition-shadow duration-300">
+                    <CardHeader className="p-0">
+                      <div className="relative overflow-hidden rounded-t-lg">
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                        <Button
+                          size="icon"
+                          variant="secondary"
+                          className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Heart className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      <CardTitle className="text-lg mb-2">{product.name}</CardTitle>
+                      <CardDescription className="flex items-center mb-2">
+                        <Star className="h-4 w-4 fill-primary text-primary mr-1" />
+                        <span className="text-sm font-medium">{product.rating}</span>
+                        <span className="text-sm text-muted-foreground ml-1">({product.reviews})</span>
+                      </CardDescription>
+                      <p className="text-2xl font-bold text-primary">${product.price}</p>
+                    </CardContent>
+                    <CardFooter className="p-4 pt-0 flex gap-2">
+                      <Link to={`/products/${product.slug}`} className="flex-1">
+                        <Button variant="outline" className="w-full">View Details</Button>
+                      </Link>
+                      <Button size="icon" onClick={() => addToCart(product)}>
+                        <ShoppingCart className="h-4 w-4" />
                       </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <CardTitle className="text-lg mb-2">{product.name}</CardTitle>
-                    <CardDescription className="flex items-center mb-2">
-                      <Star className="h-4 w-4 fill-primary text-primary mr-1" />
-                      <span className="text-sm font-medium">{product.rating}</span>
-                      <span className="text-sm text-muted-foreground ml-1">({product.reviews})</span>
-                    </CardDescription>
-                    <p className="text-2xl font-bold text-primary">${product.price}</p>
-                  </CardContent>
-                  <CardFooter className="p-4 pt-0 flex gap-2">
-                    <Link to={`/products/${product.slug}`} className="flex-1">
-                      <Button variant="outline" className="w-full">View Details</Button>
-                    </Link>
-                    <Button size="icon">
-                      <ShoppingCart className="h-4 w-4" />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+                    </CardFooter>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          )}
 
           <div className="text-center mt-12">
             <Link to="/products">
