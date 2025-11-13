@@ -18,17 +18,12 @@ import SpinWheel from './components/SpinWheel';
 import FlashSaleBanner from './components/FlashSaleBanner';
 import MarketingPopup from './components/MarketingPopup';
 
-// ✅ Robust API base URL
-const API_BASE_URL = (() => {
-  const envUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, '');
-  if (envUrl) return envUrl;
-  try {
-    return new URL('/api', window.location.origin).toString();
-  } catch {
-    console.error('Invalid API URL! Please set VITE_API_URL in your environment.');
-    return '';
-  }
-})();
+const rawApiUrl = import.meta.env.VITE_API_URL;
+const API_BASE_URL = rawApiUrl && rawApiUrl.startsWith('http')
+  ? rawApiUrl
+  : `${window.location.origin}/api`;
+
+console.log('Using API_BASE_URL:', API_BASE_URL);
 
 function App() {
   const [showSpinWheel, setShowSpinWheel] = useState(false);
