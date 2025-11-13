@@ -1,5 +1,5 @@
 import { createTransport } from "nodemailer";
-import { Twilio } from "twilio";
+import pkg from "twilio";\nconst { Twilio } = pkg;
 import { ENV } from "./_core/env";
 
 // --- Types ---
