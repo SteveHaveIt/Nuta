@@ -61,7 +61,7 @@ async function sendEmailNotification(data: OrderNotificationData) {
 
 // --- SMS Service (Twilio) ---
 
-const twilioClient = ENV.twilioAccountSid && ENV.twilioAuthToken ? twilio(ENV.twilioAccountSid, ENV.twilioAuthToken) : null;
+const twilioClient = ENV.twilioAccountSid && ENV.twilioAuthToken && ENV.twilioPhoneNumber ? twilio(ENV.twilioAccountSid, ENV.twilioAuthToken) : null;
 
 async function sendSmsNotification(data: OrderNotificationData) {
   if (!twilioClient || !data.customerPhone || !ENV.twilioPhoneNumber || !ENV.twilioAccountSid) {
