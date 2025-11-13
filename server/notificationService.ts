@@ -62,7 +62,7 @@ async function sendEmailNotification(data: OrderNotificationData) {
 // --- SMS Service (Twilio) ---
 
 const twilioClient = (() => {
-  if (ENV.twilioAccountSid && ENV.twilioAuthToken) {
+  if (ENV.twilioAccountSid && ENV.twilioAuthToken && ENV.twilioAccountSid.startsWith("AC") && ENV.twilioAuthToken.length > 10) {
     return twilio(ENV.twilioAccountSid, ENV.twilioAuthToken);
   }
   console.warn("⚠️ Twilio not configured — skipping SMS service.");
