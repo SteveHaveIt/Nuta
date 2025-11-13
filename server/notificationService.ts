@@ -1,5 +1,5 @@
 import { createTransport } from "nodemailer";
-import pkg from "twilio";\nconst { Twilio } = pkg;
+import twilio from "twilio";
 import { ENV } from "./_core/env";
 
 // --- Types ---
@@ -61,7 +61,7 @@ async function sendEmailNotification(data: OrderNotificationData) {
 
 // --- SMS Service (Twilio) ---
 
-const twilioClient = new Twilio(ENV.twilioAccountSid, ENV.twilioAuthToken);
+const twilioClient = twilio(ENV.twilioAccountSid, ENV.twilioAuthToken);
 
 async function sendSmsNotification(data: OrderNotificationData) {
   if (!data.customerPhone || !ENV.twilioPhoneNumber || !ENV.twilioAccountSid) {
