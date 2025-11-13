@@ -1,100 +1,100 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import './App.css'
-import Header from './components/Header'
-import Footer from './components/Footer'
-import HomePage from './pages/HomePage'
-import ProductsPage from './pages/ProductsPage'
-import ProductDetailPage from './pages/ProductDetailPage'
-import CartPage from './pages/CartPage'
-import CheckoutPage from './pages/CheckoutPage'
-import AccountPage from './pages/AccountPage'
-import BlogPage from './pages/BlogPage'
-import BlogPostPage from './pages/BlogPostPage'
-import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
-import PromotionsPage from './pages/PromotionsPage'
-import SpinWheel from './components/SpinWheel'
-import FlashSaleBanner from './components/FlashSaleBanner'
-import MarketingPopup from './components/MarketingPopup'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import './App.css';
+import Header from './components/Header';
+import Footer from './components/Footer';
+import HomePage from './pages/HomePage';
+import ProductsPage from './pages/ProductsPage';
+import ProductDetailPage from './pages/ProductDetailPage';
+import CartPage from './pages/CartPage';
+import CheckoutPage from './pages/CheckoutPage';
+import AccountPage from './pages/AccountPage';
+import BlogPage from './pages/BlogPage';
+import BlogPostPage from './pages/BlogPostPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import PromotionsPage from './pages/PromotionsPage';
+import SpinWheel from './components/SpinWheel';
+import FlashSaleBanner from './components/FlashSaleBanner';
+import MarketingPopup from './components/MarketingPopup';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
+// ✅ Robust API base URL
+const API_BASE_URL = (() => {
+  const envUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, '');
+  if (envUrl) return envUrl;
+  try {
+    return new URL('/api', window.location.origin).toString();
+  } catch {
+    console.error('Invalid API URL! Please set VITE_API_URL in your environment.');
+    return '';
+  }
+})();
 
 function App() {
-  const [showSpinWheel, setShowSpinWheel] = useState(false)
-  const [flashSale, setFlashSale] = useState(null)
-  const [marketingCampaign, setMarketingCampaign] = useState(null)
+  const [showSpinWheel, setShowSpinWheel] = useState(false);
+  const [flashSale, setFlashSale] = useState(null);
+  const [marketingCampaign, setMarketingCampaign] = useState(null);
 
+  // Spin wheel logic
   useEffect(() => {
-    // Show spin wheel after 5 seconds on first visit
-    const spinWheelShown = sessionStorage.getItem('spinWheelShown')
-    if (!spinWheelShown) {
+    if (!sessionStorage.getItem('spinWheelShown')) {
       const timer = setTimeout(() => {
-        setShowSpinWheel(true)
-        sessionStorage.setItem('spinWheelShown', 'true')
-      }, 5000)
-      return () => clearTimeout(timer)
+        setShowSpinWheel(true);
+        sessionStorage.setItem('spinWheelShown', 'true');
+      }, 5000);
+      return () => clearTimeout(timer);
     }
-  }, [])
+  }, []);
 
+  // Fetch flash sales
   useEffect(() => {
-    // Fetch active flash sales
+    if (!API_BASE_URL) return;
     const fetchFlashSales = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/marketing/flash-sales`)
-        const data = await response.json()
-        if (data.flashSales && data.flashSales.length > 0) {
-          setFlashSale(data.flashSales[0])
-        }
-      } catch (error) {
-        console.error('Error fetching flash sales:', error)
+        const res = await fetch(`${API_BASE_URL}/marketing/flash-sales`);
+        const data = await res.json();
+        if (data.flashSales?.length) setFlashSale(data.flashSales[0]);
+      } catch (err) {
+        console.error('Error fetching flash sales:', err);
       }
-    }
+    };
+    fetchFlashSales();
+  }, []);
 
-    fetchFlashSales()
-  }, [])
-
+  // Fetch marketing campaigns
   useEffect(() => {
-    // Fetch active marketing campaigns
+    if (!API_BASE_URL) return;
     const fetchCampaigns = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/marketing/campaigns`)
-        const data = await response.json()
-        if (data.campaigns && data.campaigns.length > 0) {
-          // Show timed popup campaigns
-          const timedCampaigns = data.campaigns.filter(c => c.triggerType === 'timed')
-          if (timedCampaigns.length > 0) {
-            const campaign = timedCampaigns[0]
-            const campaignShown = sessionStorage.getItem(`campaign_${campaign.id}`)
-            if (!campaignShown) {
-              setTimeout(() => {
-                setMarketingCampaign(campaign)
-                sessionStorage.setItem(`campaign_${campaign.id}`, 'true')
-              }, campaign.triggerDelay || 10000)
-            }
+        const res = await fetch(`${API_BASE_URL}/marketing/campaigns`);
+        const data = await res.json();
+        const timedCampaigns = data.campaigns?.filter(c => c.triggerType === 'timed') || [];
+        if (timedCampaigns.length > 0) {
+          const campaign = timedCampaigns[0];
+          if (!sessionStorage.getItem(`campaign_${campaign.id}`)) {
+            setTimeout(() => {
+              setMarketingCampaign(campaign);
+              sessionStorage.setItem(`campaign_${campaign.id}`, 'true');
+            }, campaign.triggerDelay || 10000);
           }
         }
-      } catch (error) {
-        console.error('Error fetching campaigns:', error)
+      } catch (err) {
+        console.error('Error fetching campaigns:', err);
       }
-    }
+    };
+    fetchCampaigns();
+  }, []);
 
-    fetchCampaigns()
-  }, [])
-
-  const handleCampaignAction = (campaign) => {
-    // Track interaction
+  const handleCampaignAction = campaign => {
+    if (!API_BASE_URL) return;
     fetch(`${API_BASE_URL}/marketing/campaigns/track`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ campaignId: campaign.id, action: 'clicked' })
-    })
+    }).catch(err => console.error('Error tracking campaign:', err));
 
-    // Navigate to CTA link if provided
-    if (campaign.ctaLink) {
-      window.location.href = campaign.ctaLink
-    }
-  }
+    if (campaign.ctaLink) window.location.href = campaign.ctaLink;
+  };
 
   return (
     <Router>
@@ -117,7 +117,7 @@ function App() {
           </Routes>
         </main>
         <Footer />
-        
+
         {/* Marketing Components */}
         <SpinWheel isOpen={showSpinWheel} onClose={() => setShowSpinWheel(false)} />
         {marketingCampaign && (
@@ -129,7 +129,7 @@ function App() {
         )}
       </div>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;
