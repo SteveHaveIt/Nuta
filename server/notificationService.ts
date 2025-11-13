@@ -61,7 +61,13 @@ async function sendEmailNotification(data: OrderNotificationData) {
 
 // --- SMS Service (Twilio) ---
 
-let twilioClient = null;\n\nif (ENV.twilioAccountSid && ENV.twilioAuthToken) {\n  twilioClient = twilio(ENV.twilioAccountSid, ENV.twilioAuthToken);\n} else {\n  console.warn("⚠️ Twilio not configured — skipping SMS service.");\n}
+const twilioClient = (() => {
+  if (ENV.twilioAccountSid && ENV.twilioAuthToken) {
+    return twilio(ENV.twilioAccountSid, ENV.twilioAuthToken);
+  }
+  console.warn("⚠️ Twilio not configured — skipping SMS service.");
+  return null;
+})();
 
 async function sendSmsNotification(data: OrderNotificationData) {
   if (!twilioClient || !data.customerPhone || !ENV.twilioPhoneNumber) {
