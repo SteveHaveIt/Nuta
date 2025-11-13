@@ -6,15 +6,84 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { CreditCard, Smartphone } from 'lucide-react'
 
+// Mock cart items (replace with your actual cart state)
+const cartItems = [
+  { id: 1, name: 'Creamy Peanut Butter', price: 12.99, quantity: 2 },
+  { id: 2, name: 'Premium Roasted Peanuts', price: 8.99, quantity: 1 }
+]
+
 function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState('card')
 
-  // Mock cart summary
-  const orderSummary = {
-    subtotal: 34.97,
-    shipping: 0,
-    tax: 2.80,
-    total: 37.77
+  const [shipping, setShipping] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    postalCode: '',
+    country: ''
+  })
+
+  const [cardDetails, setCardDetails] = useState({
+    cardNumber: '',
+    expiry: '',
+    cvv: ''
+  })
+
+  const [mpesaNumber, setMpesaNumber] = useState('')
+
+  // Dynamic order summary
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const shippingCost = subtotal > 50 ? 0 : 5.99
+  const tax = subtotal * 0.08
+  const total = subtotal + shippingCost + tax
+
+  const handlePlaceOrder = () => {
+    // Basic validation
+    for (let key in shipping) {
+      if (!shipping[key]) {
+        alert(`Please fill ${key}`)
+        return
+      }
+    }
+
+    if (paymentMethod === 'card') {
+      if (!cardDetails.cardNumber || !cardDetails.expiry || !cardDetails.cvv) {
+        alert('Please fill card details')
+        return
+      }
+      // Here you would call Stripe API
+      alert('Card payment successful (mock)')
+    }
+
+    if (paymentMethod === 'mpesa') {
+      if (!mpesaNumber) {
+        alert('Please enter M-PESA number')
+        return
+      }
+      // Here you would call Safaricom Daraja API
+      alert(`M-PESA payment request sent to ${mpesaNumber} (mock)`)
+    }
+
+    if (paymentMethod === 'paypal') {
+      // Redirect to PayPal checkout (mock)
+      alert('Redirecting to PayPal (mock)')
+    }
+
+    // Save order to database (mock)
+    const order = {
+      shipping,
+      paymentMethod,
+      cartItems,
+      subtotal,
+      shippingCost,
+      tax,
+      total
+    }
+    console.log('Order placed:', order)
+    alert('Order placed successfully!')
   }
 
   return (
@@ -25,7 +94,7 @@ function CheckoutPage() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Checkout Form */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Shipping Information */}
+            {/* Shipping Info */}
             <Card>
               <CardHeader>
                 <CardTitle>Shipping Information</CardTitle>
@@ -34,38 +103,96 @@ function CheckoutPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" placeholder="John" />
+                    <Input
+                      id="firstName"
+                      value={shipping.firstName}
+                      onChange={(e) =>
+                        setShipping({ ...shipping, firstName: e.target.value })
+                      }
+                      placeholder="John"
+                    />
                   </div>
                   <div>
                     <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" placeholder="Doe" />
+                    <Input
+                      id="lastName"
+                      value={shipping.lastName}
+                      onChange={(e) =>
+                        setShipping({ ...shipping, lastName: e.target.value })
+                      }
+                      placeholder="Doe"
+                    />
                   </div>
                 </div>
                 <div>
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="john@example.com" />
+                  <Input
+                    id="email"
+                    type="email"
+                    value={shipping.email}
+                    onChange={(e) =>
+                      setShipping({ ...shipping, email: e.target.value })
+                    }
+                    placeholder="john@example.com"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="phone">Phone Number</Label>
-                  <Input id="phone" type="tel" placeholder="0742101089" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={shipping.phone}
+                    onChange={(e) =>
+                      setShipping({ ...shipping, phone: e.target.value })
+                    }
+                    placeholder="0742101089"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="address">Street Address</Label>
-                  <Input id="address" placeholder="123 Main Street" />
+                  <Input
+                    id="address"
+                    value={shipping.address}
+                    onChange={(e) =>
+                      setShipping({ ...shipping, address: e.target.value })
+                    }
+                    placeholder="123 Main Street"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="city">City</Label>
-                    <Input id="city" placeholder="Nairobi" />
+                    <Input
+                      id="city"
+                      value={shipping.city}
+                      onChange={(e) =>
+                        setShipping({ ...shipping, city: e.target.value })
+                      }
+                      placeholder="Nairobi"
+                    />
                   </div>
                   <div>
                     <Label htmlFor="postalCode">Postal Code</Label>
-                    <Input id="postalCode" placeholder="00100" />
+                    <Input
+                      id="postalCode"
+                      value={shipping.postalCode}
+                      onChange={(e) =>
+                        setShipping({ ...shipping, postalCode: e.target.value })
+                      }
+                      placeholder="00100"
+                    />
                   </div>
                 </div>
                 <div>
                   <Label htmlFor="country">Country</Label>
-                  <Input id="country" placeholder="Kenya" />
+                  <Input
+                    id="country"
+                    value={shipping.country}
+                    onChange={(e) =>
+                      setShipping({ ...shipping, country: e.target.value })
+                    }
+                    placeholder="Kenya"
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -77,20 +204,23 @@ function CheckoutPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
+                  {/* Card */}
                   <div className="flex items-center space-x-2 border rounded-lg p-4 cursor-pointer hover:border-primary transition-colors">
                     <RadioGroupItem value="card" id="card" />
                     <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer flex-1">
-                      <CreditCard className="h-5 w-5" />
-                      <span>Credit/Debit Card</span>
+                      <CreditCard className="h-5 w-5" /> <span>Credit/Debit Card</span>
                     </Label>
                   </div>
+
+                  {/* M-PESA */}
                   <div className="flex items-center space-x-2 border rounded-lg p-4 cursor-pointer hover:border-primary transition-colors">
                     <RadioGroupItem value="mpesa" id="mpesa" />
                     <Label htmlFor="mpesa" className="flex items-center gap-2 cursor-pointer flex-1">
-                      <Smartphone className="h-5 w-5" />
-                      <span>M-PESA</span>
+                      <Smartphone className="h-5 w-5" /> <span>M-PESA</span>
                     </Label>
                   </div>
+
+                  {/* PayPal */}
                   <div className="flex items-center space-x-2 border rounded-lg p-4 cursor-pointer hover:border-primary transition-colors">
                     <RadioGroupItem value="paypal" id="paypal" />
                     <Label htmlFor="paypal" className="flex items-center gap-2 cursor-pointer flex-1">
@@ -102,46 +232,48 @@ function CheckoutPage() {
                   </div>
                 </RadioGroup>
 
-                {/* Card Details (shown when card is selected) */}
+                {/* Card Details */}
                 {paymentMethod === 'card' && (
                   <div className="space-y-4 pt-4">
-                    <div>
-                      <Label htmlFor="cardNumber">Card Number</Label>
-                      <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
-                    </div>
+                    <Input
+                      placeholder="Card Number"
+                      value={cardDetails.cardNumber}
+                      onChange={(e) => setCardDetails({ ...cardDetails, cardNumber: e.target.value })}
+                    />
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="expiry">Expiry Date</Label>
-                        <Input id="expiry" placeholder="MM/YY" />
-                      </div>
-                      <div>
-                        <Label htmlFor="cvv">CVV</Label>
-                        <Input id="cvv" placeholder="123" />
-                      </div>
+                      <Input
+                        placeholder="MM/YY"
+                        value={cardDetails.expiry}
+                        onChange={(e) => setCardDetails({ ...cardDetails, expiry: e.target.value })}
+                      />
+                      <Input
+                        placeholder="CVV"
+                        value={cardDetails.cvv}
+                        onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value })}
+                      />
                     </div>
                   </div>
                 )}
 
-                {/* M-PESA Details */}
+                {/* M-PESA */}
                 {paymentMethod === 'mpesa' && (
                   <div className="space-y-4 pt-4">
-                    <div>
-                      <Label htmlFor="mpesaNumber">M-PESA Phone Number</Label>
-                      <Input id="mpesaNumber" placeholder="0712345678" />
-                    </div>
+                    <Input
+                      placeholder="M-PESA Number"
+                      value={mpesaNumber}
+                      onChange={(e) => setMpesaNumber(e.target.value)}
+                    />
                     <p className="text-sm text-muted-foreground">
                       You will receive a prompt on your phone to complete the payment.
                     </p>
                   </div>
                 )}
 
-                {/* PayPal Notice */}
+                {/* PayPal */}
                 {paymentMethod === 'paypal' && (
-                  <div className="pt-4">
-                    <p className="text-sm text-muted-foreground">
-                      You will be redirected to PayPal to complete your purchase securely.
-                    </p>
-                  </div>
+                  <p className="pt-4 text-sm text-muted-foreground">
+                    You will be redirected to PayPal to complete your purchase securely.
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -157,29 +289,27 @@ function CheckoutPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-medium">${orderSummary.subtotal.toFixed(2)}</span>
+                    <span className="font-medium">${subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Shipping</span>
-                    <span className="font-medium text-green-600">FREE</span>
+                    <span className="font-medium text-green-600">{shippingCost === 0 ? 'FREE' : `$${shippingCost.toFixed(2)}`}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Tax</span>
-                    <span className="font-medium">${orderSummary.tax.toFixed(2)}</span>
+                    <span className="font-medium">${tax.toFixed(2)}</span>
                   </div>
                 </div>
                 <div className="border-t pt-4">
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-semibold">Total</span>
-                    <span className="text-2xl font-bold text-primary">
-                      ${orderSummary.total.toFixed(2)}
-                    </span>
+                    <span className="text-2xl font-bold text-primary">${total.toFixed(2)}</span>
                   </div>
                 </div>
-                <Button size="lg" className="w-full mt-4">
+                <Button size="lg" className="w-full mt-4" onClick={handlePlaceOrder}>
                   Place Order
                 </Button>
-                <p className="text-xs text-center text-muted-foreground">
+                <p className="text-xs text-center text-muted-foreground mt-2">
                   By placing your order, you agree to our Terms & Conditions and Privacy Policy
                 </p>
               </CardContent>
