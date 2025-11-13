@@ -1,10 +1,8 @@
 const app = require('./app');
-const db = require('./config/database');
 
 const PORT = process.env.PORT || 3001;
+const HOST = '0.0.0.0'; // important for Render to access
 
-app.listen(PORT, () => {
-  console.log(`Nuta Backend API running on port ${PORT}`);
-  console.log(`API: http://localhost:${PORT}/api`);
-  console.log(`Admin Dashboard: http://localhost:${PORT}/admin`);
+app.listen(PORT, HOST, () => {
+  console.log(`✅ Server running on port ${PORT}`);
 });
