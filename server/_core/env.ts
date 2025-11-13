@@ -3,10 +3,10 @@ import { z } from "zod";
 const envSchema = z.object({
   // Core
   VITE_APP_ID: z.string().optional(),
-  JWT_SECRET: z.string(),
-  DATABASE_URL: z.string(),
-  OAUTH_SERVER_URL: z.string().optional(),
-  OWNER_OPEN_ID: z.string().optional(),
+  JWT_SECRET: z.string().default("placeholder_jwt_secret_for_dev"),
+  DATABASE_URL: z.string().default("postgres://user:password@host:port/database"),
+  OAUTH_SERVER_URL: z.string().default("placeholder_oauth_server_url"),
+  OWNER_OPEN_ID: z.string().default("placeholder_owner_open_id"),
   NODE_ENV: z.enum(["development", "production"]).default("development"),
   BUILT_IN_FORGE_API_URL: z.string().optional(),
   BUILT_IN_FORGE_API_KEY: z.string().optional(),
@@ -20,9 +20,9 @@ const envSchema = z.object({
   MAIL_FROM_NAME: z.string().optional(),
 
   // Twilio (SMS/WhatsApp)
-  TWILIO_ACCOUNT_SID: z.string().optional(),
-  TWILIO_AUTH_TOKEN: z.string().optional(),
-  TWILIO_PHONE_NUMBER: z.string().optional(),
+  TWILIO_ACCOUNT_SID: z.string().default("ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"),
+  TWILIO_AUTH_TOKEN: z.string().default("placeholder_twilio_auth_token"),
+  TWILIO_PHONE_NUMBER: z.string().default("+15005550006"),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -35,11 +35,11 @@ if (!parsedEnv.success) {
 const env = parsedEnv.data;
 
 export const ENV = {
-  appId: env.VITE_APP_ID ?? "",
+  appId: env.VITE_APP_ID ?? "placeholder_app_id",
   cookieSecret: env.JWT_SECRET,
   databaseUrl: env.DATABASE_URL,
-  oAuthServerUrl: env.OAUTH_SERVER_URL ?? "",
-  ownerOpenId: env.OWNER_OPEN_ID ?? "",
+  oAuthServerUrl: env.OAUTH_SERVER_URL,
+  ownerOpenId: env.OWNER_OPEN_ID,
   isProduction: env.NODE_ENV === "production",
   forgeApiUrl: env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: env.BUILT_IN_FORGE_API_KEY ?? "",
