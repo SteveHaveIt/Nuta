@@ -1,46 +1,72 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ShoppingCart, Heart, Star, Minus, Plus, Check } from 'lucide-react'
 
+// Mock Cart Context (you can replace with actual cart context)
+const useCart = () => {
+  const [cartItems, setCartItems] = useState([])
+  const addToCart = (product, quantity) => {
+    setCartItems(prev => [...prev, { ...product, quantity }])
+    alert(`Added ${quantity} x ${product.name} to cart`)
+  }
+  return { cartItems, addToCart }
+}
+
 function ProductDetailPage() {
   const { slug } = useParams()
   const [quantity, setQuantity] = useState(1)
   const [selectedImage, setSelectedImage] = useState(0)
+  const [wishlist, setWishlist] = useState(false)
+  const { addToCart } = useCart()
 
-  // Mock data - would come from API based on slug
-  const product = {
-    name: 'Creamy Peanut Butter',
-    price: 12.99,
-    rating: 4.8,
-    reviews: 124,
-    inStock: true,
-    stockCount: 45,
-    images: [
-      'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=600&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1600952841320-db92ec4047ca?w=600&h=600&fit=crop',
-      'https://images.unsplash.com/photo-1608797178974-15b35a64ede9?w=600&h=600&fit=crop'
-    ],
-    description: 'Our signature creamy peanut butter is made from 100% premium roasted peanuts. Smooth, rich, and packed with natural protein and healthy fats. Perfect for spreading, baking, or eating straight from the jar!',
-    features: [
-      '100% Natural Ingredients',
-      'No Added Sugar',
-      'High in Protein',
-      'Gluten-Free',
-      'Vegan Friendly',
-      'No Artificial Preservatives'
-    ],
-    nutrition: {
-      servingSize: '2 tbsp (32g)',
-      calories: 190,
-      protein: '8g',
-      fat: '16g',
-      carbs: '7g',
-      fiber: '2g'
+  // Mock product data - replace with API call
+  const [product, setProduct] = useState(null)
+
+  useEffect(() => {
+    // Simulate fetching product by slug
+    const fetchProduct = async () => {
+      const mockProduct = {
+        slug: 'creamy-peanut-butter',
+        name: 'Creamy Peanut Butter',
+        price: 12.99,
+        rating: 4.8,
+        reviews: 124,
+        inStock: true,
+        stockCount: 45,
+        images: [
+          'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=600&h=600&fit=crop',
+          'https://images.unsplash.com/photo-1600952841320-db92ec4047ca?w=600&h=600&fit=crop',
+          'https://images.unsplash.com/photo-1608797178974-15b35a64ede9?w=600&h=600&fit=crop'
+        ],
+        description:
+          'Our signature creamy peanut butter is made from 100% premium roasted peanuts. Smooth, rich, and packed with natural protein and healthy fats.',
+        features: [
+          '100% Natural Ingredients',
+          'No Added Sugar',
+          'High in Protein',
+          'Gluten-Free',
+          'Vegan Friendly',
+          'No Artificial Preservatives'
+        ],
+        nutrition: {
+          servingSize: '2 tbsp (32g)',
+          calories: 190,
+          protein: '8g',
+          fat: '16g',
+          carbs: '7g',
+          fiber: '2g'
+        }
+      }
+      setProduct(mockProduct)
     }
-  }
+
+    fetchProduct()
+  }, [slug])
+
+  if (!product) return <p className="text-center py-12">Loading product...</p>
 
   const reviews = [
     {
@@ -48,14 +74,14 @@ function ProductDetailPage() {
       author: 'Sarah M.',
       rating: 5,
       date: 'March 15, 2025',
-      comment: 'Absolutely love this peanut butter! The texture is perfect and the taste is incredible. Will definitely buy again!'
+      comment: 'Absolutely love this peanut butter! The texture is perfect and the taste is incredible.'
     },
     {
       id: 2,
       author: 'John D.',
       rating: 5,
       date: 'March 10, 2025',
-      comment: 'Best peanut butter I\'ve ever had. Natural ingredients and great flavor. Highly recommend!'
+      comment: 'Best peanut butter I\'ve ever had. Natural ingredients and great flavor.'
     },
     {
       id: 3,
@@ -101,7 +127,7 @@ function ProductDetailPage() {
           {/* Product Info */}
           <div>
             <h1 className="text-4xl font-bold mb-4">{product.name}</h1>
-            
+
             <div className="flex items-center gap-4 mb-6">
               <div className="flex items-center">
                 {[...Array(5)].map((_, i) => (
@@ -116,13 +142,11 @@ function ProductDetailPage() {
                 ))}
               </div>
               <span className="text-sm text-muted-foreground">
-                {product.rating} ({product.reviews} reviews)
+                {product.rating} ({reviews.length} reviews)
               </span>
             </div>
 
-            <div className="text-4xl font-bold text-primary mb-6">
-              ${product.price}
-            </div>
+            <div className="text-4xl font-bold text-primary mb-6">${product.price}</div>
 
             <p className="text-muted-foreground mb-6">{product.description}</p>
 
@@ -174,12 +198,21 @@ function ProductDetailPage() {
 
             {/* Action Buttons */}
             <div className="flex gap-4 mb-8">
-              <Button size="lg" className="flex-1" disabled={!product.inStock}>
+              <Button
+                size="lg"
+                className="flex-1"
+                disabled={!product.inStock}
+                onClick={() => addToCart(product, quantity)}
+              >
                 <ShoppingCart className="mr-2 h-5 w-5" />
                 Add to Cart
               </Button>
-              <Button size="lg" variant="outline">
-                <Heart className="h-5 w-5" />
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => setWishlist(!wishlist)}
+              >
+                <Heart className={`h-5 w-5 ${wishlist ? 'text-red-500' : ''}`} />
               </Button>
             </div>
 
@@ -207,7 +240,7 @@ function ProductDetailPage() {
             <TabsList className="w-full justify-start">
               <TabsTrigger value="description">Description</TabsTrigger>
               <TabsTrigger value="nutrition">Nutrition Facts</TabsTrigger>
-              <TabsTrigger value="reviews">Reviews ({product.reviews})</TabsTrigger>
+              <TabsTrigger value="reviews">Reviews ({reviews.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="description" className="mt-6">
@@ -230,30 +263,12 @@ function ProductDetailPage() {
                 <CardContent className="p-6">
                   <h3 className="text-xl font-semibold mb-4">Nutrition Facts</h3>
                   <div className="space-y-2">
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="font-medium">Serving Size</span>
-                      <span>{product.nutrition.servingSize}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="font-medium">Calories</span>
-                      <span>{product.nutrition.calories}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="font-medium">Protein</span>
-                      <span>{product.nutrition.protein}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="font-medium">Total Fat</span>
-                      <span>{product.nutrition.fat}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="font-medium">Carbohydrates</span>
-                      <span>{product.nutrition.carbs}</span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="font-medium">Dietary Fiber</span>
-                      <span>{product.nutrition.fiber}</span>
-                    </div>
+                    {Object.entries(product.nutrition).map(([key, value]) => (
+                      <div key={key} className="flex justify-between py-2 border-b">
+                        <span className="font-medium">{key.charAt(0).toUpperCase() + key.slice(1)}</span>
+                        <span>{value}</span>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -274,9 +289,7 @@ function ProductDetailPage() {
                             <Star
                               key={i}
                               className={`h-4 w-4 ${
-                                i < review.rating
-                                  ? 'fill-primary text-primary'
-                                  : 'text-muted'
+                                i < review.rating ? 'fill-primary text-primary' : 'text-muted'
                               }`}
                             />
                           ))}
