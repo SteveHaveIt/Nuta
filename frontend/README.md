@@ -1,138 +1,73 @@
-# Nuta E-commerce Frontend
+# React + TypeScript + Vite
 
-This is the frontend application for the Nuta e-commerce website, built with React, Vite, Tailwind CSS, and shadcn/ui.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## Features
+Currently, two official plugins are available:
 
-- Homepage with hero section and featured products
-- Product catalog with filtering
-- Individual product detail pages
-- Shopping cart functionality
-- Checkout process
-- User authentication (Login/Register)
-- Blog section
-- Promotions page with:
-  - Spin Wheel
-  - Giveaways
-  - Social Media Contests
-  - Flash Sales
-- Responsive design with peanut-inspired branding
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## Prerequisites
+## React Compiler
 
-- Node.js 18+ and pnpm installed
-- Backend API running (see backend README)
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-## Local Development
+## Expanding the ESLint configuration
 
-1. Install dependencies:
-   ```bash
-   pnpm install
-   ```
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-2. Create a `.env` file based on `.env.example`:
-   ```bash
-   cp .env.example .env
-   ```
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
 
-3. Update the `.env` file with your backend API URL:
-   ```
-   VITE_API_URL=http://localhost:3001
-   ```
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
 
-4. Start the development server:
-   ```bash
-   pnpm run dev
-   ```
-
-5. Open your browser and navigate to `http://localhost:5173`
-
-## Build for Production
-
-```bash
-pnpm run build
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
 
-The built files will be in the `dist` directory.
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-## Deploy to Vercel
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
 
-### Option 1: Vercel CLI
-
-1. Install Vercel CLI:
-   ```bash
-   npm install -g vercel
-   ```
-
-2. Login to Vercel:
-   ```bash
-   vercel login
-   ```
-
-3. Deploy:
-   ```bash
-   vercel
-   ```
-
-4. Set environment variable in Vercel dashboard:
-   - `VITE_API_URL`: Your deployed backend URL (e.g., `https://your-backend.onrender.com`)
-
-### Option 2: Vercel Dashboard
-
-1. Go to [vercel.com](https://vercel.com) and sign in
-2. Click "Add New Project"
-3. Import your Git repository or upload the frontend folder
-4. Vercel will auto-detect the Vite framework
-5. Add environment variable:
-   - Key: `VITE_API_URL`
-   - Value: Your deployed backend URL (e.g., `https://your-backend.onrender.com`)
-6. Click "Deploy"
-
-## Environment Variables
-
-- `VITE_API_URL`: The URL of your backend API (required)
-
-## Tech Stack
-
-- React 18
-- Vite
-- Tailwind CSS
-- shadcn/ui
-- React Router
-- Framer Motion
-- Lucide React
-
-## Project Structure
-
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
-src/
-├── components/       # Reusable UI components
-│   ├── Header.jsx
-│   ├── Footer.jsx
-│   ├── SpinWheel.jsx
-│   ├── MarketingPopup.jsx
-│   ├── FlashSaleBanner.jsx
-│   ├── GiveawayCard.jsx
-│   ├── SocialContestCard.jsx
-│   └── ui/          # shadcn/ui components
-├── pages/           # Page components
-│   ├── HomePage.jsx
-│   ├── ProductsPage.jsx
-│   ├── ProductDetailPage.jsx
-│   ├── CartPage.jsx
-│   ├── CheckoutPage.jsx
-│   ├── AccountPage.jsx
-│   ├── BlogPage.jsx
-│   ├── LoginPage.jsx
-│   ├── RegisterPage.jsx
-│   └── PromotionsPage.jsx
-├── config/          # Configuration files
-│   └── api.js
-├── App.jsx          # Main app component
-└── main.jsx         # Entry point
-```
-
-## License
-
-Proprietary - Steve Have It Enterprise Hub
-
