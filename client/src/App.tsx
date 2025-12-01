@@ -14,6 +14,7 @@ import Checkout from "./pages/Checkout";
 import About from "./pages/About";
 import Production from "./pages/Production";
 import Contact from "./pages/Contact";
+import WhatsAppButton from "./components/WhatsAppButton";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -54,6 +55,7 @@ function App() {
               <Router />
             </main>
             <Footer />
+            <WhatsAppButton />
           </div>
         </TooltipProvider>
       </ThemeProvider>

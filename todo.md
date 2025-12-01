@@ -85,3 +85,37 @@
 ✅ Responsive design with Tailwind CSS
 ✅ Brand-aligned UI with Nuta colors
 ✅ All company assets integrated
+
+
+## Phase 2 - Enhancement Requests (In Progress)
+
+### Checkout & Payment Enhancements
+- [x] Improve Cart page UX with better product display
+- [x] Rebuild Checkout page with shipping address form
+- [x] Collect customer email during checkout
+- [x] Integrate M-Pesa STK Push payment flow properly
+- [ ] Add payment status tracking
+- [x] Create order confirmation page with tracking number
+
+### Communication & Notifications
+- [x] Add WhatsApp button (0742101089) to all pages
+- [x] Implement email notifications for order confirmation
+- [ ] Add SMS notifications for payment status
+- [x] Create newsletter subscription form
+- [ ] Integrate SMS delivery for newsletter (via info.stevehaveit@gmail.com)
+- [x] Send tracking details via email after payment
+- [x] Add logistics and delivery information to order emails
+
+### Navigation & UI Improvements
+- [x] Enhance header navigation with better styling
+- [x] Improve button clickability and visual feedback
+- [x] Add WhatsApp floating button
+- [x] Improve mobile navigation menu
+- [ ] Add breadcrumb navigation
+
+### Order Tracking System
+- [ ] Create order tracking page
+- [ ] Generate unique tracking numbers
+- [ ] Send tracking updates via email
+- [ ] Display shipment status and delivery info
+- [ ] Add estimated delivery date calculation

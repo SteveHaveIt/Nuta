@@ -175,6 +175,25 @@ export type Subscriber = typeof subscribers.$inferSelect;
 export type InsertSubscriber = typeof subscribers.$inferInsert;
 
 /**
+ * Order tracking and shipment information
+ */
+export const orderTracking = mysqlTable("orderTracking", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull().references(() => orders.id),
+  trackingNumber: varchar("trackingNumber", { length: 100 }).notNull().unique(),
+  carrier: varchar("carrier", { length: 100 }), // e.g., "DHL", "FedEx", "Local Courier"
+  status: mysqlEnum("status", ["pending", "in_transit", "out_for_delivery", "delivered", "failed"]).default("pending").notNull(),
+  estimatedDeliveryDate: timestamp("estimatedDeliveryDate"),
+  actualDeliveryDate: timestamp("actualDeliveryDate"),
+  lastUpdate: text("lastUpdate"), // Latest tracking update message
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type OrderTracking = typeof orderTracking.$inferSelect;
+export type InsertOrderTracking = typeof orderTracking.$inferInsert;
+
+/**
  * Contact form submissions
  */
 export const contactSubmissions = mysqlTable("contactSubmissions", {

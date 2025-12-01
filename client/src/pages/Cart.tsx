@@ -1,40 +1,45 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
 import { formatPrice, getCartSessionId } from "@/lib/cart";
-import { Trash2, ShoppingBag } from "lucide-react";
+import { Trash2, ShoppingBag, ArrowLeft, Plus, Minus } from "lucide-react";
 import { toast } from "sonner";
 
 interface CartItem {
   productId: number;
   quantity: number;
+  product?: any;
 }
 
 export default function Cart() {
+  const [, setLocation] = useLocation();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Map<number, any>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
 
   const sessionId = getCartSessionId();
+  const { data: allProducts } = trpc.products.getAll.useQuery();
 
-  // Load cart from localStorage
+  // Load cart from localStorage and fetch product details
   useEffect(() => {
-    const cart = JSON.parse(localStorage.getItem('cart') || '{}');
+    const cart = JSON.parse(localStorage.getItem("cart") || "{}");
     const items = cart[sessionId] || [];
     setCartItems(items);
 
-    // Fetch products for cart items
-    if (items.length > 0) {
-      const productIds = items.map((item: CartItem) => item.productId);
-      // In a real app, you'd fetch these from the API
-      // For now, we'll just set loading to false
-      setIsLoading(false);
-    } else {
-      setIsLoading(false);
+    if (allProducts && items.length > 0) {
+      const productMap = new Map();
+      items.forEach((item: CartItem) => {
+        const product = allProducts.find((p) => p.id === item.productId);
+        if (product) {
+          productMap.set(item.productId, product);
+        }
+      });
+      setProducts(productMap);
     }
-  }, [sessionId]);
+    setIsLoading(false);
+  }, [sessionId, allProducts]);
 
   const handleUpdateQuantity = (productId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -42,45 +47,44 @@ export default function Cart() {
       return;
     }
 
-    const updatedCart = cartItems.map(item =>
+    const updatedCart = cartItems.map((item) =>
       item.productId === productId ? { ...item, quantity: newQuantity } : item
     );
     setCartItems(updatedCart);
 
-    const cart = JSON.parse(localStorage.getItem('cart') || '{}');
+    const cart = JSON.parse(localStorage.getItem("cart") || "{}");
     cart[sessionId] = updatedCart;
-    localStorage.setItem('cart', JSON.stringify(cart));
+    localStorage.setItem("cart", JSON.stringify(cart));
+    toast.success("Cart updated");
   };
 
   const handleRemoveItem = (productId: number) => {
-    const updatedCart = cartItems.filter(item => item.productId !== productId);
+    const updatedCart = cartItems.filter((item) => item.productId !== productId);
     setCartItems(updatedCart);
 
-    const cart = JSON.parse(localStorage.getItem('cart') || '{}');
+    const cart = JSON.parse(localStorage.getItem("cart") || "{}");
     cart[sessionId] = updatedCart;
-    localStorage.setItem('cart', JSON.stringify(cart));
-
+    localStorage.setItem("cart", JSON.stringify(cart));
     toast.success("Item removed from cart");
   };
 
-  const handleClearCart = () => {
-    setCartItems([]);
-    const cart = JSON.parse(localStorage.getItem('cart') || '{}');
-    cart[sessionId] = [];
-    localStorage.setItem('cart', JSON.stringify(cart));
-    toast.success("Cart cleared");
+  const calculateTotal = () => {
+    return cartItems.reduce((total, item) => {
+      const product = products.get(item.productId);
+      return total + (product?.price || 0) * item.quantity;
+    }, 0);
   };
 
-  // Calculate totals (placeholder - would need actual product prices)
-  const subtotal = 0; // Would calculate from products
-  const tax = Math.round(subtotal * 0.16); // 16% VAT
-  const total = subtotal + tax;
+  const subtotal = calculateTotal();
+  const shippingCost = subtotal > 0 ? 50000 : 0; // 500 KES in cents
+  const total = subtotal + shippingCost;
 
   if (isLoading) {
     return (
-      <div className="min-h-screen py-12">
-        <div className="container">
-          <p>Loading cart...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-orange-600 animate-bounce" />
+          <p className="text-gray-600">Loading your cart...</p>
         </div>
       </div>
     );
@@ -88,135 +92,165 @@ export default function Cart() {
 
   if (cartItems.length === 0) {
     return (
-      <div className="min-h-screen py-12">
-        <div className="container">
-          <div className="text-center py-12">
-            <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h1 className="text-3xl font-bold mb-2">Your Cart is Empty</h1>
-            <p className="text-muted-foreground mb-8">
-              Add some delicious Nuta products to get started!
-            </p>
-            <Link href="/products">
-              <Button size="lg">Continue Shopping</Button>
-            </Link>
-          </div>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-orange-50 to-white">
+        <ShoppingBag className="w-20 h-20 text-orange-300 mb-4" />
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Your Cart is Empty</h1>
+        <p className="text-gray-600 mb-8">Add some delicious Nuta products to get started!</p>
+        <Link href="/products">
+          <Button size="lg" className="bg-orange-600 hover:bg-orange-700">
+            Continue Shopping
+          </Button>
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen py-12">
-      <div className="container">
-        <h1 className="text-4xl font-bold mb-8">Shopping Cart</h1>
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/products">
+            <Button variant="ghost" size="sm" className="text-gray-600 hover:text-orange-600">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Continue Shopping
+            </Button>
+          </Link>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <h1 className="text-4xl font-bold text-gray-800 mb-8">Shopping Cart</h1>
+
+        <div className="grid lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2">
-            <Card className="p-6">
+            <Card className="p-6 shadow-lg">
               <div className="space-y-6">
-                {cartItems.map((item) => (
-                  <div key={item.productId} className="border-b pb-6 last:border-0">
-                    <div className="flex gap-4">
-                      {/* Product Image Placeholder */}
-                      <div className="w-20 h-20 bg-secondary rounded-lg flex-shrink-0" />
+                {cartItems.map((item) => {
+                  const product = products.get(item.productId);
+                  if (!product) return null;
 
-                      {/* Product Info */}
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg mb-1">Product Name</h3>
-                        <p className="text-sm text-muted-foreground mb-4">Product SKU</p>
-
-                        {/* Quantity */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">Qty:</span>
-                          <div className="flex items-center border border-input rounded">
-                            <button
-                              onClick={() => handleUpdateQuantity(item.productId, item.quantity - 1)}
-                              className="px-2 py-1 hover:bg-secondary"
-                            >
-                              −
-                            </button>
-                            <input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => handleUpdateQuantity(item.productId, parseInt(e.target.value) || 1)}
-                              className="w-10 text-center border-none outline-none"
-                              min="1"
-                            />
-                            <button
-                              onClick={() => handleUpdateQuantity(item.productId, item.quantity + 1)}
-                              className="px-2 py-1 hover:bg-secondary"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
+                  return (
+                    <div
+                      key={item.productId}
+                      className="flex gap-4 pb-6 border-b last:border-b-0 last:pb-0"
+                    >
+                      {/* Product Image */}
+                      <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
 
-                      {/* Price and Remove */}
-                      <div className="text-right">
-                        <p className="text-lg font-semibold mb-4">KES 0.00</p>
+                      {/* Product Details */}
+                      <div className="flex-1">
+                        <Link href={`/product/${product.id}`}>
+                          <h3 className="text-lg font-semibold text-gray-800 hover:text-orange-600 cursor-pointer">
+                            {product.name}
+                          </h3>
+                        </Link>
+                        <p className="text-sm text-gray-600 mt-1">{product.weight}</p>
+                        <p className="text-xl font-bold text-orange-600 mt-2">
+                          {formatPrice(product.price)}
+                        </p>
+                      </div>
+
+                      {/* Quantity Controls */}
+                      <div className="flex flex-col items-end gap-4">
+                        <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                          <button
+                            onClick={() =>
+                              handleUpdateQuantity(item.productId, item.quantity - 1)
+                            }
+                            className="p-1 hover:bg-gray-200 rounded"
+                          >
+                            <Minus className="w-4 h-4 text-gray-600" />
+                          </button>
+                          <span className="w-8 text-center font-semibold">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() =>
+                              handleUpdateQuantity(item.productId, item.quantity + 1)
+                            }
+                            className="p-1 hover:bg-gray-200 rounded"
+                          >
+                            <Plus className="w-4 h-4 text-gray-600" />
+                          </button>
+                        </div>
+
                         <button
                           onClick={() => handleRemoveItem(item.productId)}
-                          className="text-red-600 hover:text-red-700 transition-colors"
+                          className="text-red-500 hover:text-red-700 flex items-center gap-1"
                         >
-                          <Trash2 className="h-5 w-5" />
+                          <Trash2 className="w-4 h-4" />
+                          Remove
                         </button>
+
+                        <p className="text-lg font-semibold text-gray-800">
+                          {formatPrice(product.price * item.quantity)}
+                        </p>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 pt-6 border-t">
-                <button
-                  onClick={handleClearCart}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Clear Cart
-                </button>
+                  );
+                })}
               </div>
             </Card>
           </div>
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <Card className="p-6 sticky top-4">
-              <h2 className="text-xl font-bold mb-6">Order Summary</h2>
+            <Card className="p-6 shadow-lg sticky top-20 bg-white">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Order Summary</h2>
 
               <div className="space-y-4 mb-6">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>{formatPrice(subtotal)}</span>
+                <div className="flex justify-between text-gray-600">
+                  <span>Subtotal ({cartItems.length} items)</span>
+                  <span className="font-semibold">{formatPrice(subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tax (16%)</span>
-                  <span>{formatPrice(tax)}</span>
+                <div className="flex justify-between text-gray-600">
+                  <span>Shipping</span>
+                  <span className="font-semibold">{formatPrice(shippingCost)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Shipping</span>
-                  <span>Calculated at checkout</span>
-                </div>
-              </div>
-
-              <div className="border-t pt-4 mb-6">
-                <div className="flex justify-between text-lg font-bold">
+                <div className="border-t pt-4 flex justify-between text-xl font-bold text-gray-800">
                   <span>Total</span>
-                  <span>{formatPrice(total)}</span>
+                  <span className="text-orange-600">{formatPrice(total)}</span>
                 </div>
               </div>
 
-              <Link href="/checkout">
-                <Button className="w-full mb-3" size="lg">
-                  Proceed to Checkout
-                </Button>
-              </Link>
+              <Button
+                onClick={() => setLocation("/checkout")}
+                size="lg"
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg mb-3"
+              >
+                Proceed to Checkout
+              </Button>
 
-              <Link href="/products">
-                <Button variant="outline" className="w-full">
-                  Continue Shopping
-                </Button>
-              </Link>
+              <Button
+                onClick={() => setLocation("/products")}
+                variant="outline"
+                size="lg"
+                className="w-full border-orange-600 text-orange-600 hover:bg-orange-50"
+              >
+                Continue Shopping
+              </Button>
+
+              {/* Trust Badges */}
+              <div className="mt-6 pt-6 border-t space-y-3 text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">✓</span>
+                  <span>Secure checkout with M-Pesa</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">✓</span>
+                  <span>Fast delivery across Kenya</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">✓</span>
+                  <span>100% Natural Products</span>
+                </div>
+              </div>
             </Card>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { formatPrice } from "@/lib/cart";
 import { Star, Leaf, Heart } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import NewsletterSignup from "@/components/NewsletterSignup";
 
 export default function Home() {
   const { data: featuredProducts, isLoading: productsLoading } = trpc.products.getFeatured.useQuery();
@@ -201,6 +202,13 @@ export default function Home() {
               </p>
             </Card>
           </div>
+        </div>
+      </section>
+
+      {/* Newsletter Section */}
+      <section className="py-16 md:py-24 bg-gradient-to-b from-white to-orange-50">
+        <div className="container max-w-2xl">
+          <NewsletterSignup />
         </div>
       </section>
 
