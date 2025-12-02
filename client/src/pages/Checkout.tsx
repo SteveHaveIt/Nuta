@@ -94,12 +94,9 @@ export default function Checkout() {
     setIsLoading(false);
   }, [sessionId, allProducts, apiCartItems]);
 
-  // Redirect if cart is empty
-  useEffect(() => {
-    if (cartItems.length === 0 && !isProcessing && !isLoading) {
-      setLocation("/cart");
-    }
-  }, [cartItems, setLocation, isProcessing, isLoading]);
+  // Show message if cart is empty (but don't redirect immediately)
+  // This allows time for cart to load from API
+  const shouldShowEmptyCart = cartItems.length === 0 && !isLoading && !isProcessing;
 
   const calculateTotal = () => {
     return cartItems.reduce((total, item) => {
@@ -183,11 +180,15 @@ export default function Checkout() {
           setCurrentStep("confirmation");
         }, 3000);
       } else {
-        toast.error("Failed to initiate payment");
+        const errorMsg = paymentResponse.message || "Failed to initiate payment";
+        console.error("Payment failed:", errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
-      console.error("Payment error:", error);
-      toast.error("Payment failed. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      console.error("Payment error details:", error);
+      console.error("Error message:", errorMessage);
+      toast.error(`Payment failed: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
@@ -204,7 +205,8 @@ export default function Checkout() {
     );
   }
 
-  if (cartItems.length === 0) {
+  // Only show empty cart message after loading is complete
+  if (cartItems.length === 0 && !isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-orange-50 to-white">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Your Cart is Empty</h1>
