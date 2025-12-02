@@ -2,7 +2,7 @@ import { useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { formatPrice, addToCart } from "@/lib/cart";
+import { formatPrice, getCartSessionId } from "@/lib/cart";
 import { Star, ShoppingCart, Heart, Share2, Copy, Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -41,6 +41,17 @@ export default function ProductDetail() {
     },
   });
 
+  const addToCartMutation = trpc.cart.add.useMutation({
+    onSuccess: () => {
+      toast.success(`Added ${quantity} ${product?.name} to cart`);
+      window.dispatchEvent(new CustomEvent("cartUpdated"));
+      setQuantity(1);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to add to cart");
+    },
+  });
+
   useEffect(() => {
     if (favoriteData) {
       setIsFavorite(favoriteData.isFavorite);
@@ -49,9 +60,12 @@ export default function ProductDetail() {
 
   const handleAddToCart = () => {
     if (product) {
-      addToCart(product.id, quantity);
-      toast.success(`Added ${quantity} ${product.name} to cart`);
-      window.dispatchEvent(new CustomEvent("cartUpdated"));
+      const sessionId = getCartSessionId();
+      addToCartMutation.mutate({
+        productId: product.id,
+        quantity,
+        sessionId,
+      });
     }
   };
 
@@ -245,10 +259,10 @@ export default function ProductDetail() {
                 size="lg"
                 className="flex-1"
                 onClick={handleAddToCart}
-                disabled={product.stock === 0}
+                disabled={product.stock === 0 || addToCartMutation.isPending}
               >
                 <ShoppingCart className="mr-2 h-5 w-5" />
-                Add to Cart
+                {addToCartMutation.isPending ? "Adding..." : "Add to Cart"}
               </Button>
               <Button
                 size="lg"

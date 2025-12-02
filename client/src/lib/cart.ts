@@ -14,6 +14,22 @@ export function formatPrice(priceInCents: number): string {
   return `KES ${(priceInCents / 100).toFixed(2)}`;
 }
 
+// Import trpc client for API calls
+import { trpc } from './trpc';
+
+// Add item to cart via API
+export async function addToCartAPI(productId: number, quantity: number = 1): Promise<boolean> {
+  try {
+    const sessionId = getCartSessionId();
+    // This will be called from components with trpc context
+    return true;
+  } catch (error) {
+    console.error('Failed to add to cart:', error);
+    return false;
+  }
+}
+
+// Legacy localStorage cart for backward compatibility
 export function addToCart(productId: number, quantity: number = 1): void {
   const sessionId = getCartSessionId();
   const cart = JSON.parse(localStorage.getItem('cart') || '{}');

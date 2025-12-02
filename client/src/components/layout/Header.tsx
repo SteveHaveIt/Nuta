@@ -7,21 +7,43 @@ import { getCartSessionId } from "@/lib/cart";
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [localCartCount, setLocalCartCount] = useState(0);
   const sessionId = getCartSessionId();
   const { data: cartItems, refetch: refetchCart } = trpc.cart.get.useQuery({ sessionId });
   
+  // Update cart count from localStorage
+  const updateLocalCartCount = () => {
+    try {
+      const cart = JSON.parse(localStorage.getItem("cart") || "{}");
+      const items = cart[sessionId] || [];
+      const count = items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+      setLocalCartCount(count);
+    } catch (error) {
+      console.error("Error reading cart from localStorage:", error);
+    }
+  };
+
+  // Initialize local cart count on mount
+  useEffect(() => {
+    updateLocalCartCount();
+  }, [sessionId]);
+
   // Listen for cart updates and refetch
   useEffect(() => {
     const handleCartUpdate = () => {
       refetchCart();
+      updateLocalCartCount();
     };
     
-    window.addEventListener('cartUpdated', handleCartUpdate);
-    return () => window.removeEventListener('cartUpdated', handleCartUpdate);
+    window.addEventListener("cartUpdated", handleCartUpdate);
+    return () => window.removeEventListener("cartUpdated", handleCartUpdate);
   }, [refetchCart]);
 
-  const cartItemCount = cartItems?.reduce((sum, item) => sum + item.cartItem.quantity, 0) || 0;
-
+  // Calculate cart count from API
+  const apiCartCount = cartItems?.reduce((sum, item) => sum + item.cartItem.quantity, 0) || 0;
+  
+  // Use API cart if available, otherwise fall back to localStorage
+  const cartItemCount = apiCartCount > 0 ? apiCartCount : localCartCount;
 
   const navLinks = [
     { href: "/", label: "Home" },
