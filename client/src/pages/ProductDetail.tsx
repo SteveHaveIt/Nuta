@@ -1,4 +1,4 @@
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
 
 export default function ProductDetail() {
   const [, params] = useRoute("/products/:slug");
+  const [, setLocation] = useLocation();
   const slug = params?.slug as string;
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -324,6 +325,27 @@ export default function ProductDetail() {
                 )}
               </div>
             </div>
+
+            {/* Quick Checkout Button */}
+            <Button
+              size="lg"
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg mt-4"
+              onClick={async () => {
+                if (product) {
+                  const sessionId = getCartSessionId();
+                  await addToCartMutation.mutateAsync({
+                    productId: product.id,
+                    quantity,
+                    sessionId,
+                  });
+                  // Navigate to checkout after adding to cart
+                  setTimeout(() => setLocation("/checkout"), 500);
+                }
+              }}
+              disabled={product.stock === 0 || addToCartMutation.isPending}
+            >
+              🚀 Checkout Now
+            </Button>
 
             {/* Trust Badges */}
             <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm text-gray-600">

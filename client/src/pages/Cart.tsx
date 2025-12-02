@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { formatPrice, getCartSessionId } from "@/lib/cart";
 import { Trash2, ShoppingBag, ArrowLeft, Plus, Minus } from "lucide-react";
 import { toast } from "sonner";
+import { useState, useEffect } from "react";
 
 interface CartItem {
   productId: number;
@@ -21,16 +21,53 @@ export default function Cart() {
 
   const sessionId = getCartSessionId();
   const { data: allProducts } = trpc.products.getAll.useQuery();
+  const { data: apiCartItems, refetch: refetchApiCart } = trpc.cart.get.useQuery({ sessionId });
 
-  // Load cart from localStorage and fetch product details
+  // Listen for cart updates
   useEffect(() => {
-    const cart = JSON.parse(localStorage.getItem("cart") || "{}");
-    const items = cart[sessionId] || [];
-    setCartItems(items);
+    const handleCartUpdate = () => {
+      refetchApiCart();
+    };
+    
+    window.addEventListener("cartUpdated", handleCartUpdate);
+    return () => window.removeEventListener("cartUpdated", handleCartUpdate);
+  }, [refetchApiCart]);
 
-    if (allProducts && items.length > 0) {
+  // Load cart from both API and localStorage
+  useEffect(() => {
+    const mergedItems: CartItem[] = [];
+    const itemMap = new Map<number, CartItem>();
+
+    // First, add items from API (database cart)
+    if (apiCartItems && apiCartItems.length > 0) {
+      apiCartItems.forEach((item: any) => {
+        const productId = item.cartItem.productId;
+        const quantity = item.cartItem.quantity;
+        itemMap.set(productId, { productId, quantity });
+      });
+    }
+
+    // Then, add items from localStorage (fallback for legacy carts)
+    try {
+      const cart = JSON.parse(localStorage.getItem("cart") || "{}");
+      const localItems = cart[sessionId] || [];
+      localItems.forEach((item: CartItem) => {
+        if (!itemMap.has(item.productId)) {
+          itemMap.set(item.productId, item);
+        }
+      });
+    } catch (error) {
+      console.error("Error reading localStorage cart:", error);
+    }
+
+    // Convert map to array
+    itemMap.forEach((item) => mergedItems.push(item));
+    setCartItems(mergedItems);
+
+    // Fetch product details
+    if (allProducts && mergedItems.length > 0) {
       const productMap = new Map();
-      items.forEach((item: CartItem) => {
+      mergedItems.forEach((item: CartItem) => {
         const product = allProducts.find((p) => p.id === item.productId);
         if (product) {
           productMap.set(item.productId, product);
@@ -39,7 +76,7 @@ export default function Cart() {
       setProducts(productMap);
     }
     setIsLoading(false);
-  }, [sessionId, allProducts]);
+  }, [sessionId, allProducts, apiCartItems]);
 
   const handleUpdateQuantity = (productId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -52,9 +89,11 @@ export default function Cart() {
     );
     setCartItems(updatedCart);
 
+    // Update localStorage
     const cart = JSON.parse(localStorage.getItem("cart") || "{}");
     cart[sessionId] = updatedCart;
     localStorage.setItem("cart", JSON.stringify(cart));
+    
     toast.success("Cart updated");
   };
 
@@ -62,9 +101,11 @@ export default function Cart() {
     const updatedCart = cartItems.filter((item) => item.productId !== productId);
     setCartItems(updatedCart);
 
+    // Update localStorage
     const cart = JSON.parse(localStorage.getItem("cart") || "{}");
     cart[sessionId] = updatedCart;
     localStorage.setItem("cart", JSON.stringify(cart));
+    
     toast.success("Item removed from cart");
   };
 
@@ -150,8 +191,8 @@ export default function Cart() {
                             {product.name}
                           </h3>
                         </Link>
-                        <p className="text-sm text-gray-600 mt-1">{product.weight}</p>
-                        <p className="text-xl font-bold text-orange-600 mt-2">
+                        <p className="text-gray-600 text-sm mb-2">{product.weight}</p>
+                        <p className="text-orange-600 font-semibold">
                           {formatPrice(product.price)}
                         </p>
                       </div>
@@ -165,7 +206,7 @@ export default function Cart() {
                             }
                             className="p-1 hover:bg-gray-200 rounded"
                           >
-                            <Minus className="w-4 h-4 text-gray-600" />
+                            <Minus className="w-4 h-4" />
                           </button>
                           <span className="w-8 text-center font-semibold">
                             {item.quantity}
@@ -176,21 +217,24 @@ export default function Cart() {
                             }
                             className="p-1 hover:bg-gray-200 rounded"
                           >
-                            <Plus className="w-4 h-4 text-gray-600" />
+                            <Plus className="w-4 h-4" />
                           </button>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">Subtotal</p>
+                          <p className="text-lg font-bold text-gray-800">
+                            {formatPrice(product.price * item.quantity)}
+                          </p>
                         </div>
 
                         <button
                           onClick={() => handleRemoveItem(item.productId)}
-                          className="text-red-500 hover:text-red-700 flex items-center gap-1"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors"
+                          title="Remove item"
                         >
-                          <Trash2 className="w-4 h-4" />
-                          Remove
+                          <Trash2 className="w-5 h-5" />
                         </button>
-
-                        <p className="text-lg font-semibold text-gray-800">
-                          {formatPrice(product.price * item.quantity)}
-                        </p>
                       </div>
                     </div>
                   );
@@ -200,22 +244,22 @@ export default function Cart() {
           </div>
 
           {/* Order Summary */}
-          <div className="lg:col-span-1">
-            <Card className="p-6 shadow-lg sticky top-20 bg-white">
+          <div>
+            <Card className="p-6 shadow-lg sticky top-24">
               <h2 className="text-2xl font-bold text-gray-800 mb-6">Order Summary</h2>
 
               <div className="space-y-4 mb-6">
                 <div className="flex justify-between text-gray-600">
-                  <span>Subtotal ({cartItems.length} items)</span>
-                  <span className="font-semibold">{formatPrice(subtotal)}</span>
+                  <span>Subtotal</span>
+                  <span>{formatPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
-                  <span className="font-semibold">{formatPrice(shippingCost)}</span>
+                  <span>{formatPrice(shippingCost)}</span>
                 </div>
-                <div className="border-t pt-4 flex justify-between text-xl font-bold text-gray-800">
+                <div className="border-t pt-4 flex justify-between text-lg font-bold text-gray-800">
                   <span>Total</span>
-                  <span className="text-orange-600">{formatPrice(total)}</span>
+                  <span>{formatPrice(total)}</span>
                 </div>
               </div>
 
@@ -239,16 +283,16 @@ export default function Cart() {
               {/* Trust Badges */}
               <div className="mt-6 pt-6 border-t space-y-3 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">✓</span>
-                  <span>Secure checkout with M-Pesa</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">✓</span>
-                  <span>Fast delivery across Kenya</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">✓</span>
+                  <span>✓</span>
                   <span>100% Natural Products</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>✓</span>
+                  <span>Fast Delivery Across Kenya</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>✓</span>
+                  <span>Secure M-Pesa Payment</span>
                 </div>
               </div>
             </Card>
