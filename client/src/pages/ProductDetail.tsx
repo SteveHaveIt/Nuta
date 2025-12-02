@@ -333,13 +333,20 @@ export default function ProductDetail() {
               onClick={async () => {
                 if (product) {
                   const sessionId = getCartSessionId();
-                  await addToCartMutation.mutateAsync({
-                    productId: product.id,
-                    quantity,
-                    sessionId,
-                  });
-                  // Navigate to checkout after adding to cart
-                  setTimeout(() => setLocation("/checkout"), 500);
+                  try {
+                    await addToCartMutation.mutateAsync({
+                      productId: product.id,
+                      quantity,
+                      sessionId,
+                    });
+                    // Dispatch event to update cart badge
+                    window.dispatchEvent(new CustomEvent("cartUpdated"));
+                    // Navigate to checkout after adding to cart
+                    setLocation("/checkout");
+                  } catch (error) {
+                    console.error("Error adding to cart:", error);
+                    toast.error("Failed to add item to cart");
+                  }
                 }
               }}
               disabled={product.stock === 0 || addToCartMutation.isPending}

@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { formatPrice, getCartSessionId } from "@/lib/cart";
 import { ArrowLeft, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useState, useEffect } from "react";
 
 interface CartItem {
   productId: number;
@@ -31,6 +31,7 @@ export default function Checkout() {
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   const [shippingForm, setShippingForm] = useState<ShippingForm>({
     customerName: "",
@@ -43,18 +44,46 @@ export default function Checkout() {
 
   const sessionId = getCartSessionId();
   const { data: allProducts } = trpc.products.getAll.useQuery();
+  const { data: apiCartItems, refetch: refetchApiCart } = trpc.cart.get.useQuery({ sessionId });
   const createOrderMutation = trpc.orders.create.useMutation();
   const initiatePaymentMutation = trpc.payment.initiateSTKPush.useMutation();
 
-  // Load cart items
+  // Load cart items from both API and localStorage
   useEffect(() => {
-    const cart = JSON.parse(localStorage.getItem("cart") || "{}");
-    const items = cart[sessionId] || [];
-    setCartItems(items);
+    const mergedItems: CartItem[] = [];
+    const itemMap = new Map<number, CartItem>();
 
-    if (allProducts && items.length > 0) {
+    // First, add items from API (database cart)
+    if (apiCartItems && apiCartItems.length > 0) {
+      apiCartItems.forEach((item: any) => {
+        const productId = item.cartItem.productId;
+        const quantity = item.cartItem.quantity;
+        itemMap.set(productId, { productId, quantity });
+      });
+    }
+
+    // Then, add items from localStorage (fallback for legacy carts)
+    try {
+      const cart = JSON.parse(localStorage.getItem("cart") || "{}");
+      const localItems = cart[sessionId] || [];
+      localItems.forEach((item: CartItem) => {
+        if (!itemMap.has(item.productId)) {
+          itemMap.set(item.productId, item);
+        }
+      });
+    } catch (error) {
+      console.error("Error reading localStorage cart:", error);
+    }
+
+    // Convert map to array
+    const mergedCartItems: CartItem[] = [];
+    itemMap.forEach((item) => mergedCartItems.push(item));
+    setCartItems(mergedCartItems);
+
+    // Fetch product details
+    if (allProducts && mergedCartItems.length > 0) {
       const productMap = new Map();
-      items.forEach((item: CartItem) => {
+      mergedCartItems.forEach((item: CartItem) => {
         const product = allProducts.find((p) => p.id === item.productId);
         if (product) {
           productMap.set(item.productId, product);
@@ -62,14 +91,15 @@ export default function Checkout() {
       });
       setProducts(productMap);
     }
-  }, [sessionId, allProducts]);
+    setIsLoading(false);
+  }, [sessionId, allProducts, apiCartItems]);
 
   // Redirect if cart is empty
   useEffect(() => {
-    if (cartItems.length === 0 && !isProcessing) {
+    if (cartItems.length === 0 && !isProcessing && !isLoading) {
       setLocation("/cart");
     }
-  }, [cartItems, setLocation, isProcessing]);
+  }, [cartItems, setLocation, isProcessing, isLoading]);
 
   const calculateTotal = () => {
     return cartItems.reduce((total, item) => {
@@ -98,110 +128,162 @@ export default function Checkout() {
       toast.error("Please fill in all required fields");
       return false;
     }
-
-    // Validate phone number (Kenya format)
-    if (!/^(\+254|0)[17][0-9]{8}$/.test(shippingForm.customerPhone.replace(/\s/g, ""))) {
-      toast.error("Please enter a valid Kenyan phone number");
-      return false;
-    }
-
-    // Validate email
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingForm.customerEmail)) {
-      toast.error("Please enter a valid email address");
-      return false;
-    }
-
     return true;
   };
 
-  const handleProceedToPayment = () => {
-    if (validateShippingForm()) {
-      setCurrentStep("payment");
-    }
-  };
+  const handlePayment = async () => {
+    if (!validateShippingForm()) return;
 
-  const handleInitiatePayment = async () => {
     setIsProcessing(true);
     try {
+      // Transform cart items to match API schema
+      const itemsForOrder = cartItems.map((item) => {
+        const product = products.get(item.productId);
+        return {
+          productId: item.productId,
+          productName: product?.name || "Unknown Product",
+          quantity: item.quantity,
+          price: product?.price || 0,
+          productImage: product?.image,
+        };
+      });
+
       // Create order first
-      const orderData = {
+      const orderResponse = await createOrderMutation.mutateAsync({
         customerName: shippingForm.customerName,
         customerEmail: shippingForm.customerEmail,
         customerPhone: shippingForm.customerPhone,
-        shippingAddress: `${shippingForm.shippingAddress}, ${shippingForm.city}${
-          shippingForm.postalCode ? ", " + shippingForm.postalCode : ""
-        }`,
+        shippingAddress: shippingForm.shippingAddress,
+        items: itemsForOrder,
         totalAmount: total,
-        items: cartItems.map((item) => {
-          const product = products.get(item.productId);
-          return {
-            productId: item.productId,
-            productName: product?.name || "Product",
-            productImage: product?.imageUrl,
-            quantity: item.quantity,
-            price: product?.price || 0,
-          };
-        }),
-      };
+        sessionId,
+      });
 
-      const order = await createOrderMutation.mutateAsync(orderData);
-      setOrderNumber(order.orderNumber);
+      setOrderNumber(orderResponse.orderNumber);
 
-      // Format phone number for Lipana API (254XXXXXXXXX format)
-      const formattedPhone = shippingForm.customerPhone
-        .replace(/^0/, "254")
-        .replace(/\D/g, "");
-
-      // Initiate M-Pesa payment
+      // Initiate payment
       const paymentResponse = await initiatePaymentMutation.mutateAsync({
-        phoneNumber: formattedPhone,
+        orderId: orderResponse.orderId,
+        orderNumber: orderResponse.orderNumber,
         amount: total,
-        orderId: order.orderId,
-        orderNumber: order.orderNumber,
+        phoneNumber: shippingForm.customerPhone,
       });
 
       if (paymentResponse.success) {
-        toast.success("M-Pesa prompt sent to your phone! Please enter your PIN.");
-        // Clear cart
+        setCurrentStep("payment");
+        toast.success("Payment initiated! Check your phone for STK Push");
+
+        // Clear cart after successful order
         const cart = JSON.parse(localStorage.getItem("cart") || "{}");
         cart[sessionId] = [];
         localStorage.setItem("cart", JSON.stringify(cart));
         setCartItems([]);
-        setCurrentStep("confirmation");
+
+        // Move to confirmation after a delay
+        setTimeout(() => {
+          setCurrentStep("confirmation");
+        }, 3000);
       } else {
-        toast.error(paymentResponse?.message || "Payment initiation failed");
+        toast.error("Failed to initiate payment");
       }
-    } catch (error: any) {
-      toast.error(error.message || "An error occurred. Please try again.");
+    } catch (error) {
+      console.error("Payment error:", error);
+      toast.error("Payment failed. Please try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Shipping Step
-  if (currentStep === "shipping") {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white py-12 px-4">
-        <div className="max-w-4xl mx-auto">
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-orange-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading checkout...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (cartItems.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-orange-50 to-white">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Your Cart is Empty</h1>
+        <p className="text-gray-600 mb-8">Please add items before checking out</p>
+        <Button
+          onClick={() => setLocation("/products")}
+          size="lg"
+          className="bg-orange-600 hover:bg-orange-700"
+        >
+          Continue Shopping
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white py-12 px-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
           <Button
             variant="ghost"
+            size="sm"
             onClick={() => setLocation("/cart")}
-            className="mb-6 text-gray-600 hover:text-orange-600"
+            className="text-gray-600 hover:text-orange-600"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Cart
           </Button>
+        </div>
 
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Shipping Form */}
-            <div className="lg:col-span-2">
+        <h1 className="text-4xl font-bold text-gray-800 mb-8">Checkout</h1>
+
+        {/* Step Indicator */}
+        <div className="flex gap-4 mb-8">
+          <div
+            className={`flex-1 py-3 px-4 rounded-lg text-center font-semibold ${
+              currentStep === "shipping"
+                ? "bg-orange-600 text-white"
+                : currentStep === "payment" || currentStep === "confirmation"
+                ? "bg-green-600 text-white"
+                : "bg-gray-200 text-gray-600"
+            }`}
+          >
+            1. Shipping
+          </div>
+          <div
+            className={`flex-1 py-3 px-4 rounded-lg text-center font-semibold ${
+              currentStep === "payment"
+                ? "bg-orange-600 text-white"
+                : currentStep === "confirmation"
+                ? "bg-green-600 text-white"
+                : "bg-gray-200 text-gray-600"
+            }`}
+          >
+            2. Payment
+          </div>
+          <div
+            className={`flex-1 py-3 px-4 rounded-lg text-center font-semibold ${
+              currentStep === "confirmation"
+                ? "bg-green-600 text-white"
+                : "bg-gray-200 text-gray-600"
+            }`}
+          >
+            3. Confirmation
+          </div>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2">
+            {currentStep === "shipping" && (
               <Card className="p-8 shadow-lg">
-                <h1 className="text-3xl font-bold text-gray-800 mb-8">Shipping Information</h1>
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">Shipping Information</h2>
 
-                <form className="space-y-6">
-                  {/* Name */}
+                <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Full Name *
                     </label>
                     <input
@@ -209,235 +291,190 @@ export default function Checkout() {
                       name="customerName"
                       value={shippingForm.customerName}
                       onChange={handleShippingChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
                       placeholder="John Doe"
                     />
                   </div>
 
-                  {/* Email */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Email Address *
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email *
                     </label>
                     <input
                       type="email"
                       name="customerEmail"
                       value={shippingForm.customerEmail}
                       onChange={handleShippingChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
                       placeholder="john@example.com"
                     />
                   </div>
 
-                  {/* Phone */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Phone Number (M-Pesa) *
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone Number *
                     </label>
                     <input
                       type="tel"
                       name="customerPhone"
                       value={shippingForm.customerPhone}
                       onChange={handleShippingChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      placeholder="0742101089"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
+                      placeholder="+254712345678"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Format: 0712345678 or +254712345678
-                    </p>
                   </div>
 
-                  {/* Address */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Street Address *
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Shipping Address *
                     </label>
                     <textarea
                       name="shippingAddress"
                       value={shippingForm.shippingAddress}
                       onChange={handleShippingChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      placeholder="123 Main Street, Apartment 4B"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
+                      placeholder="123 Main Street"
                       rows={3}
                     />
                   </div>
 
-                  {/* City */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      City/Town *
-                    </label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={shippingForm.city}
-                      onChange={handleShippingChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      placeholder="Nairobi"
-                    />
-                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        name="city"
+                        value={shippingForm.city}
+                        onChange={handleShippingChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
+                        placeholder="Nairobi"
+                      />
+                    </div>
 
-                  {/* Postal Code */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Postal Code (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      name="postalCode"
-                      value={shippingForm.postalCode}
-                      onChange={handleShippingChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      placeholder="00100"
-                    />
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Postal Code
+                      </label>
+                      <input
+                        type="text"
+                        name="postalCode"
+                        value={shippingForm.postalCode}
+                        onChange={handleShippingChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
+                        placeholder="00100"
+                      />
+                    </div>
                   </div>
 
                   <Button
-                    onClick={handleProceedToPayment}
+                    onClick={handlePayment}
+                    disabled={isProcessing}
                     size="lg"
-                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg"
+                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg mt-6"
                   >
-                    Proceed to Payment
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      "Continue to Payment"
+                    )}
                   </Button>
-                </form>
+                </div>
               </Card>
-            </div>
+            )}
 
-            {/* Order Summary */}
-            <div className="lg:col-span-1">
-              <Card className="p-6 shadow-lg sticky top-20">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">Order Summary</h2>
+            {currentStep === "payment" && (
+              <Card className="p-8 shadow-lg text-center">
+                <Loader2 className="w-16 h-16 animate-spin text-orange-600 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Processing Payment</h2>
+                <p className="text-gray-600">
+                  Please check your phone for the M-Pesa STK Push prompt...
+                </p>
+              </Card>
+            )}
 
-                <div className="space-y-3 mb-6 max-h-64 overflow-y-auto">
-                  {cartItems.map((item) => {
-                    const product = products.get(item.productId);
-                    if (!product) return null;
-                    return (
-                      <div key={item.productId} className="flex justify-between text-sm">
-                        <span className="text-gray-600">
-                          {product.name} x{item.quantity}
-                        </span>
-                        <span className="font-semibold">
-                          {formatPrice(product.price * item.quantity)}
-                        </span>
+            {currentStep === "confirmation" && (
+              <Card className="p-8 shadow-lg text-center">
+                <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Order Confirmed!</h2>
+                <p className="text-gray-600 mb-4">
+                  Your order has been placed successfully.
+                </p>
+                <p className="text-lg font-semibold text-orange-600 mb-6">
+                  Order Number: {orderNumber}
+                </p>
+                <Button
+                  onClick={() => setLocation("/")}
+                  size="lg"
+                  className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg"
+                >
+                  Back to Home
+                </Button>
+              </Card>
+            )}
+          </div>
+
+          {/* Order Summary */}
+          <div>
+            <Card className="p-6 shadow-lg sticky top-24">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Order Summary</h2>
+
+              <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                {cartItems.map((item) => {
+                  const product = products.get(item.productId);
+                  if (!product) return null;
+
+                  return (
+                    <div key={item.productId} className="flex justify-between text-sm pb-4 border-b">
+                      <div>
+                        <p className="font-semibold text-gray-800">{product.name}</p>
+                        <p className="text-gray-600">Qty: {item.quantity}</p>
                       </div>
-                    );
-                  })}
-                </div>
+                      <p className="font-semibold text-gray-800">
+                        {formatPrice(product.price * item.quantity)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
 
-                <div className="border-t pt-4 space-y-2">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Subtotal</span>
-                    <span>{formatPrice(subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Shipping</span>
-                    <span>{formatPrice(shippingCost)}</span>
-                  </div>
-                  <div className="flex justify-between text-xl font-bold text-orange-600 pt-2 border-t">
-                    <span>Total</span>
-                    <span>{formatPrice(total)}</span>
-                  </div>
+              <div className="space-y-4 mb-6 border-t pt-4">
+                <div className="flex justify-between text-gray-600">
+                  <span>Subtotal</span>
+                  <span>{formatPrice(subtotal)}</span>
                 </div>
-              </Card>
-            </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Shipping</span>
+                  <span>{formatPrice(shippingCost)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold text-gray-800 pt-4 border-t">
+                  <span>Total</span>
+                  <span>{formatPrice(total)}</span>
+                </div>
+              </div>
+
+              {/* Trust Badges */}
+              <div className="space-y-3 text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                  <span>✓</span>
+                  <span>100% Natural Products</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>✓</span>
+                  <span>Fast Delivery Across Kenya</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>✓</span>
+                  <span>Secure M-Pesa Payment</span>
+                </div>
+              </div>
+            </Card>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  // Payment Step
-  if (currentStep === "payment") {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white py-12 px-4">
-        <div className="max-w-2xl mx-auto">
-          <Card className="p-8 shadow-lg text-center">
-            <h1 className="text-3xl font-bold text-gray-800 mb-4">Payment</h1>
-            <p className="text-gray-600 mb-8">
-              Click below to complete your payment via M-Pesa. You will receive a prompt on your
-              phone.
-            </p>
-
-            <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-6 mb-8">
-              <p className="text-sm text-gray-600 mb-2">Total Amount</p>
-              <p className="text-4xl font-bold text-orange-600">{formatPrice(total)}</p>
-            </div>
-
-            <Button
-              onClick={handleInitiatePayment}
-              disabled={isProcessing}
-              size="lg"
-              className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg mb-4"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                "Pay with M-Pesa"
-              )}
-            </Button>
-
-            <Button
-              onClick={() => setCurrentStep("shipping")}
-              variant="outline"
-              size="lg"
-              className="w-full border-orange-600 text-orange-600 hover:bg-orange-50"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Shipping
-            </Button>
-
-            <div className="mt-8 text-left space-y-3 text-sm text-gray-600">
-              <p className="font-semibold text-gray-800">How M-Pesa Payment Works:</p>
-              <ol className="list-decimal list-inside space-y-2">
-                <li>Click "Pay with M-Pesa" button</li>
-                <li>You'll receive an M-Pesa prompt on your phone</li>
-                <li>Enter your M-Pesa PIN to complete payment</li>
-                <li>Receive confirmation and tracking details via email</li>
-              </ol>
-            </div>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // Confirmation Step
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        <Card className="p-8 shadow-lg text-center">
-          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Payment Successful!</h1>
-          <p className="text-gray-600 mb-8">
-            Your order has been confirmed. You will receive tracking details via email shortly.
-          </p>
-
-          <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
-            <p className="text-sm text-gray-600">Order Number</p>
-            <p className="text-2xl font-bold text-gray-800">{orderNumber}</p>
-            <p className="text-sm text-gray-600 mt-4">Total Paid</p>
-            <p className="text-2xl font-bold text-orange-600">{formatPrice(total)}</p>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
-            <p className="text-sm text-blue-900">
-              📧 A confirmation email with tracking details has been sent to{" "}
-              <strong>{shippingForm.customerEmail}</strong>
-            </p>
-          </div>
-
-          <Button
-            onClick={() => setLocation("/")}
-            size="lg"
-            className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg"
-          >
-            Back to Home
-          </Button>
-        </Card>
       </div>
     </div>
   );

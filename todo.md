@@ -223,3 +223,29 @@
 - [x] Verify navigation is working
 - [x] Check if checkout page is loading
 - [x] Fix button functionality - Missing useLocation import in Cart.tsx
+
+
+## Phase 8 - Critical Checkout Flow Bugs (Complete)
+
+### Bug 1: Checkout Now Button Adds Items Instead of Navigating
+- [x] Diagnose why button adds items instead of navigating to checkout
+- [x] Check async/await logic in ProductDetail.tsx
+- [x] Fix button to navigate immediately to checkout
+- [x] Verify cart is updated before navigation
+- [x] Added event dispatch and error handling
+
+### Bug 2: Delete Button Doesn't Update Cart Badge
+- [x] Diagnose why badge doesn't update after deleting items
+- [x] Check if delete event is dispatched
+- [x] Verify Header listens for delete events
+- [x] Fix badge to reflect deleted items immediately
+- [x] Added window.dispatchEvent("cartUpdated") to handleRemoveItem
+
+### Bug 3: Proceed to Checkout Doesn't Navigate to Payment Page
+- [x] Diagnose why button doesn't navigate to checkout page
+- [x] Check if checkout page is rendering
+- [x] Verify navigation is working
+- [x] Check if cart data is being passed to checkout page
+- [x] Fixed Checkout.tsx to load from both API and localStorage
+- [x] Fixed cart item transformation for API schema
+- [x] All TypeScript errors resolved

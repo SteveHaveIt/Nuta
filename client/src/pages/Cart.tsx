@@ -106,6 +106,9 @@ export default function Cart() {
     cart[sessionId] = updatedCart;
     localStorage.setItem("cart", JSON.stringify(cart));
     
+    // Dispatch event to update cart badge
+    window.dispatchEvent(new CustomEvent("cartUpdated"));
+    
     toast.success("Item removed from cart");
   };
 
