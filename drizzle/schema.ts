@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, decimal } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, decimal, index } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -209,3 +209,24 @@ export const contactSubmissions = mysqlTable("contactSubmissions", {
 
 export type ContactSubmission = typeof contactSubmissions.$inferSelect;
 export type InsertContactSubmission = typeof contactSubmissions.$inferInsert;
+
+/**
+ * User favorites / wishlist
+ */
+export const favorites = mysqlTable(
+  "favorites",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").references(() => users.id),
+    productId: int("productId").notNull().references(() => products.id),
+    sessionId: varchar("sessionId", { length: 255 }), // For guest users
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    userProductIndex: index("idx_user_product").on(table.userId, table.productId),
+    sessionProductIndex: index("idx_session_product").on(table.sessionId, table.productId),
+  })
+);
+
+export type Favorite = typeof favorites.$inferSelect;
+export type InsertFavorite = typeof favorites.$inferInsert;

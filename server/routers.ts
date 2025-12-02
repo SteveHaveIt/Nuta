@@ -312,9 +312,40 @@ export const appRouter = router({
           // Don't fail the request if email fails
         }
 
-        return { success: true, submissionId };
+         return { success: true, submissionId };
       }),
   }),
-});
 
+  favorites: router({
+    toggle: publicProcedure
+      .input(z.object({ productId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const userId = ctx.user?.id;
+        const sessionId = ctx.req.headers.cookie
+          ?.split('; ')
+          .find(c => c.startsWith('cart_session_id='))
+          ?.split('=')?.[1];
+
+        const isFav = await db.toggleFavorite(input.productId, userId, sessionId);
+        return { isFavorite: isFav };
+      }),
+
+    check: publicProcedure
+      .input(z.object({ productId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const userId = ctx.user?.id;
+        const sessionId = ctx.req.headers.cookie
+          ?.split('; ')
+          .find(c => c.startsWith('cart_session_id='))
+          ?.split('=')?.[1];
+
+        const isFav = await db.isFavorite(input.productId, userId, sessionId);
+        return { isFavorite: isFav };
+      }),
+
+    getByUser: protectedProcedure.query(async ({ ctx }) => {
+      return await db.getFavoritesByUser(ctx.user.id);
+    }),
+  }),
+});
 export type AppRouter = typeof appRouter;

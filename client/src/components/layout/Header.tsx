@@ -1,15 +1,27 @@
 import { Link } from "wouter";
 import { ShoppingCart, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { getCartSessionId } from "@/lib/cart";
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { data: cartItems } = trpc.cart.get.useQuery({ sessionId: getCartSessionId() });
+  const sessionId = getCartSessionId();
+  const { data: cartItems, refetch: refetchCart } = trpc.cart.get.useQuery({ sessionId });
+  
+  // Listen for cart updates and refetch
+  useEffect(() => {
+    const handleCartUpdate = () => {
+      refetchCart();
+    };
+    
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    return () => window.removeEventListener('cartUpdated', handleCartUpdate);
+  }, [refetchCart]);
 
   const cartItemCount = cartItems?.reduce((sum, item) => sum + item.cartItem.quantity, 0) || 0;
+
 
   const navLinks = [
     { href: "/", label: "Home" },

@@ -12,6 +12,7 @@ import {
   promotions,
   subscribers,
   contactSubmissions,
+  favorites,
   InsertProduct,
   InsertCategory,
   InsertReview,
@@ -21,6 +22,7 @@ import {
   InsertPromotion,
   InsertSubscriber,
   InsertContactSubmission,
+  InsertFavorite,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -325,4 +327,107 @@ export async function createContactSubmission(submission: InsertContactSubmissio
   if (!db) throw new Error("Database not available");
   const result = await db.insert(contactSubmissions).values(submission);
   return result[0].insertId;
+}
+
+// ===== FAVORITES / WISHLIST =====
+
+export async function toggleFavorite(
+  productId: number,
+  userId?: number,
+  sessionId?: string
+) {
+  const db = await getDb();
+  if (!db) return false;
+
+  try {
+    // Check if favorite already exists
+    const existing = await db
+      .select()
+      .from(favorites)
+      .where(
+        and(
+          eq(favorites.productId, productId),
+          userId ? eq(favorites.userId, userId) : eq(favorites.sessionId, sessionId!)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      // Remove favorite
+      await db
+        .delete(favorites)
+        .where(eq(favorites.id, existing[0].id));
+      return false; // Removed
+    } else {
+      // Add favorite
+      await db.insert(favorites).values({
+        productId,
+        userId: userId || null,
+        sessionId: sessionId || null,
+      });
+      return true; // Added
+    }
+  } catch (error) {
+    console.error("[Database] Failed to toggle favorite:", error);
+    throw error;
+  }
+}
+
+export async function getFavoritesByUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(favorites)
+      .where(eq(favorites.userId, userId));
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to get user favorites:", error);
+    return [];
+  }
+}
+
+export async function getFavoritesBySession(sessionId: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(favorites)
+      .where(eq(favorites.sessionId, sessionId));
+    return result;
+  } catch (error) {
+    console.error("[Database] Failed to get session favorites:", error);
+    return [];
+  }
+}
+
+export async function isFavorite(
+  productId: number,
+  userId?: number,
+  sessionId?: string
+): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  try {
+    const result = await db
+      .select()
+      .from(favorites)
+      .where(
+        and(
+          eq(favorites.productId, productId),
+          userId ? eq(favorites.userId, userId) : eq(favorites.sessionId, sessionId!)
+        )
+      )
+      .limit(1);
+
+    return result.length > 0;
+  } catch (error) {
+    console.error("[Database] Failed to check favorite:", error);
+    return false;
+  }
 }
