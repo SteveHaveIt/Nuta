@@ -249,3 +249,15 @@
 - [x] Fixed Checkout.tsx to load from both API and localStorage
 - [x] Fixed cart item transformation for API schema
 - [x] All TypeScript errors resolved
+
+
+## Phase 9 - Continue to Payment Button Fixed (Complete)
+
+### Payment Button Issue
+- [x] Diagnose why "Continue to Payment" button doesn't progress to payment step
+- [x] Check button click handler
+- [x] Verify form validation is working
+- [x] Check if mutation is being called
+- [x] Fix button to properly transition to payment step
+- [x] Root cause: validateShippingForm was checking for city field that doesn't exist
+- [x] Fixed by removing city validation check

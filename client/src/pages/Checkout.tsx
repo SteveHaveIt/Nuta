@@ -122,8 +122,7 @@ export default function Checkout() {
       !shippingForm.customerName ||
       !shippingForm.customerEmail ||
       !shippingForm.customerPhone ||
-      !shippingForm.shippingAddress ||
-      !shippingForm.city
+      !shippingForm.shippingAddress
     ) {
       toast.error("Please fill in all required fields");
       return false;
