@@ -1,11 +1,13 @@
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { formatPrice, getCartSessionId } from "@/lib/cart";
-import { ArrowLeft, Loader2, CheckCircle } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { PaymentModal } from "@/components/PaymentModal";
 
 interface CartItem {
   productId: number;
@@ -18,7 +20,6 @@ interface ShippingForm {
   customerEmail: string;
   customerPhone: string;
   shippingAddress: string;
-  city: string;
   postalCode: string;
 }
 
@@ -26,34 +27,31 @@ export default function Checkout() {
   const [, setLocation] = useLocation();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [products, setProducts] = useState<Map<number, any>>(new Map());
-  const [currentStep, setCurrentStep] = useState<"shipping" | "payment" | "confirmation">(
-    "shipping"
-  );
+  const [currentStep, setCurrentStep] = useState<"shipping" | "payment" | "processing">("shipping");
+  const [isLoading, setIsLoading] = useState(true);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [trackingId, setTrackingId] = useState("");
 
   const [shippingForm, setShippingForm] = useState<ShippingForm>({
     customerName: "",
     customerEmail: "",
     customerPhone: "",
     shippingAddress: "",
-    city: "",
     postalCode: "",
   });
 
   const sessionId = getCartSessionId();
   const { data: allProducts } = trpc.products.getAll.useQuery();
-  const { data: apiCartItems, refetch: refetchApiCart } = trpc.cart.get.useQuery({ sessionId });
+  const { data: apiCartItems } = trpc.cart.get.useQuery({ sessionId });
   const createOrderMutation = trpc.orders.create.useMutation();
   const initiatePaymentMutation = trpc.payment.initiateSTKPush.useMutation();
 
-  // Load cart items from both API and localStorage
   useEffect(() => {
     const mergedItems: CartItem[] = [];
     const itemMap = new Map<number, CartItem>();
 
-    // First, add items from API (database cart)
     if (apiCartItems && apiCartItems.length > 0) {
       apiCartItems.forEach((item: any) => {
         const productId = item.cartItem.productId;
@@ -62,7 +60,6 @@ export default function Checkout() {
       });
     }
 
-    // Then, add items from localStorage (fallback for legacy carts)
     try {
       const cart = JSON.parse(localStorage.getItem("cart") || "{}");
       const localItems = cart[sessionId] || [];
@@ -75,12 +72,10 @@ export default function Checkout() {
       console.error("Error reading localStorage cart:", error);
     }
 
-    // Convert map to array
     const mergedCartItems: CartItem[] = [];
     itemMap.forEach((item) => mergedCartItems.push(item));
     setCartItems(mergedCartItems);
 
-    // Fetch product details
     if (allProducts && mergedCartItems.length > 0) {
       const productMap = new Map();
       mergedCartItems.forEach((item: CartItem) => {
@@ -91,12 +86,9 @@ export default function Checkout() {
       });
       setProducts(productMap);
     }
+
     setIsLoading(false);
   }, [sessionId, allProducts, apiCartItems]);
-
-  // Show message if cart is empty (but don't redirect immediately)
-  // This allows time for cart to load from API
-  const shouldShowEmptyCart = cartItems.length === 0 && !isLoading && !isProcessing;
 
   const calculateTotal = () => {
     return cartItems.reduce((total, item) => {
@@ -106,7 +98,7 @@ export default function Checkout() {
   };
 
   const subtotal = calculateTotal();
-  const shippingCost = 50000; // 500 KES in cents
+  const shippingCost = 50000;
   const total = subtotal + shippingCost;
 
   const handleShippingChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -115,24 +107,40 @@ export default function Checkout() {
   };
 
   const validateShippingForm = () => {
-    if (
-      !shippingForm.customerName ||
-      !shippingForm.customerEmail ||
-      !shippingForm.customerPhone ||
-      !shippingForm.shippingAddress
-    ) {
-      toast.error("Please fill in all required fields");
+    if (!shippingForm.customerName.trim()) {
+      toast.error("Please enter your name");
+      return false;
+    }
+    if (!shippingForm.customerEmail.trim()) {
+      toast.error("Please enter your email");
+      return false;
+    }
+    if (!shippingForm.customerPhone.trim()) {
+      toast.error("Please enter your phone number");
+      return false;
+    }
+    if (!shippingForm.shippingAddress.trim()) {
+      toast.error("Please enter your shipping address");
+      return false;
+    }
+    if (!shippingForm.postalCode.trim()) {
+      toast.error("Please enter your postal code");
       return false;
     }
     return true;
   };
 
-  const handlePayment = async () => {
+  const handleContinueToPayment = () => {
     if (!validateShippingForm()) return;
+    setCurrentStep("payment");
+    setShowPaymentModal(true);
+  };
 
+  const handlePaymentInitiate = async (phoneNumber: string) => {
     setIsProcessing(true);
     try {
-      // Transform cart items to match API schema
+      console.log("Creating order...");
+
       const itemsForOrder = cartItems.map((item) => {
         const product = products.get(item.productId);
         return {
@@ -144,7 +152,6 @@ export default function Checkout() {
         };
       });
 
-      // Create order first
       const orderResponse = await createOrderMutation.mutateAsync({
         customerName: shippingForm.customerName,
         customerEmail: shippingForm.customerEmail,
@@ -155,40 +162,56 @@ export default function Checkout() {
         sessionId,
       });
 
+      console.log("Order created:", orderResponse);
       setOrderNumber(orderResponse.orderNumber);
+      setTrackingId(`TRK-${orderResponse.orderId}`);
 
-      // Initiate payment
+      console.log("Initiating STK Push with phone:", phoneNumber);
       const paymentResponse = await initiatePaymentMutation.mutateAsync({
         orderId: orderResponse.orderId,
         orderNumber: orderResponse.orderNumber,
         amount: total,
-        phoneNumber: shippingForm.customerPhone,
+        phoneNumber: phoneNumber,
       });
 
-      if (paymentResponse.success) {
-        setCurrentStep("payment");
-        toast.success("Payment initiated! Check your phone for STK Push");
+      console.log("Payment response:", paymentResponse);
 
-        // Clear cart after successful order
+      if (paymentResponse.success) {
+        setCurrentStep("processing");
+        setShowPaymentModal(false);
+        toast.success("STK Push sent! Check your phone to complete payment.");
+
+        sessionStorage.setItem(
+          "lastOrder",
+          JSON.stringify({
+            orderNumber: orderResponse.orderNumber,
+            trackingId: `TRK-${orderResponse.orderId}`,
+            total: total,
+            items: itemsForOrder,
+            shippingAddress: shippingForm.shippingAddress,
+            customerEmail: shippingForm.customerEmail,
+            customerPhone: shippingForm.customerPhone,
+            status: "success",
+          })
+        );
+
         const cart = JSON.parse(localStorage.getItem("cart") || "{}");
         cart[sessionId] = [];
         localStorage.setItem("cart", JSON.stringify(cart));
-        setCartItems([]);
+        window.dispatchEvent(new Event("cartUpdated"));
 
-        // Move to confirmation after a delay
         setTimeout(() => {
-          setCurrentStep("confirmation");
+          setLocation("/order-confirmation");
         }, 3000);
       } else {
-        const errorMsg = paymentResponse.message || "Failed to initiate payment";
-        console.error("Payment failed:", errorMsg);
-        toast.error(errorMsg);
+        toast.error(paymentResponse.message || "Failed to initiate payment");
+        setShowPaymentModal(true);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      console.error("Payment error details:", error);
-      console.error("Error message:", errorMessage);
+      console.error("Payment error:", error);
       toast.error(`Payment failed: ${errorMessage}`);
+      setShowPaymentModal(true);
     } finally {
       setIsProcessing(false);
     }
@@ -199,13 +222,12 @@ export default function Checkout() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-orange-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading checkout...</p>
+          <p className="text-gray-600">Loading cart...</p>
         </div>
       </div>
     );
   }
 
-  // Only show empty cart message after loading is complete
   if (cartItems.length === 0 && !isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-orange-50 to-white">
@@ -225,7 +247,6 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-orange-50 to-white py-12 px-4">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Button
             variant="ghost"
@@ -240,13 +261,12 @@ export default function Checkout() {
 
         <h1 className="text-4xl font-bold text-gray-800 mb-8">Checkout</h1>
 
-        {/* Step Indicator */}
         <div className="flex gap-4 mb-8">
           <div
             className={`flex-1 py-3 px-4 rounded-lg text-center font-semibold ${
               currentStep === "shipping"
                 ? "bg-orange-600 text-white"
-                : currentStep === "payment" || currentStep === "confirmation"
+                : currentStep === "payment" || currentStep === "processing"
                 ? "bg-green-600 text-white"
                 : "bg-gray-200 text-gray-600"
             }`}
@@ -257,7 +277,7 @@ export default function Checkout() {
             className={`flex-1 py-3 px-4 rounded-lg text-center font-semibold ${
               currentStep === "payment"
                 ? "bg-orange-600 text-white"
-                : currentStep === "confirmation"
+                : currentStep === "processing"
                 ? "bg-green-600 text-white"
                 : "bg-gray-200 text-gray-600"
             }`}
@@ -266,217 +286,172 @@ export default function Checkout() {
           </div>
           <div
             className={`flex-1 py-3 px-4 rounded-lg text-center font-semibold ${
-              currentStep === "confirmation"
-                ? "bg-green-600 text-white"
-                : "bg-gray-200 text-gray-600"
+              currentStep === "processing" ? "bg-green-600 text-white" : "bg-gray-200 text-gray-600"
             }`}
           >
             3. Confirmation
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             {currentStep === "shipping" && (
-              <Card className="p-8 shadow-lg">
+              <Card className="p-8">
                 <h2 className="text-2xl font-bold text-gray-800 mb-6">Shipping Information</h2>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                    <Input
                       name="customerName"
                       value={shippingForm.customerName}
                       onChange={handleShippingChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
                       placeholder="John Doe"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                    <Input
                       name="customerEmail"
+                      type="email"
                       value={shippingForm.customerEmail}
                       onChange={handleShippingChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
                       placeholder="john@example.com"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number *
-                    </label>
-                    <input
-                      type="tel"
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                    <Input
                       name="customerPhone"
+                      type="tel"
                       value={shippingForm.customerPhone}
                       onChange={handleShippingChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
-                      placeholder="+254712345678"
+                      placeholder="0742101089"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Shipping Address *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Address</label>
                     <textarea
                       name="shippingAddress"
                       value={shippingForm.shippingAddress}
                       onChange={handleShippingChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
-                      placeholder="123 Main Street"
+                      placeholder="123 Main Street, Apartment 4B"
                       rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        City *
-                      </label>
-                      <input
-                        type="text"
-                        name="city"
-                        value={shippingForm.city}
-                        onChange={handleShippingChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
-                        placeholder="Nairobi"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Postal Code
-                      </label>
-                      <input
-                        type="text"
-                        name="postalCode"
-                        value={shippingForm.postalCode}
-                        onChange={handleShippingChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600"
-                        placeholder="00100"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Postal Code</label>
+                    <Input
+                      name="postalCode"
+                      value={shippingForm.postalCode}
+                      onChange={handleShippingChange}
+                      placeholder="00100"
+                    />
                   </div>
-
-                  <Button
-                    onClick={handlePayment}
-                    disabled={isProcessing}
-                    size="lg"
-                    className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg mt-6"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      "Continue to Payment"
-                    )}
-                  </Button>
                 </div>
+
+                <Button
+                  onClick={handleContinueToPayment}
+                  size="lg"
+                  className="w-full mt-8 bg-orange-600 hover:bg-orange-700"
+                >
+                  Continue to Payment
+                </Button>
               </Card>
             )}
 
             {currentStep === "payment" && (
-              <Card className="p-8 shadow-lg text-center">
-                <Loader2 className="w-16 h-16 animate-spin text-orange-600 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Processing Payment</h2>
-                <p className="text-gray-600">
-                  Please check your phone for the M-Pesa STK Push prompt...
+              <Card className="p-8 text-center">
+                <h2 className="text-2xl font-bold text-gray-800 mb-6">Ready for Payment?</h2>
+                <p className="text-gray-600 mb-8">
+                  Click the button below to enter your M-Pesa phone number and complete your payment.
                 </p>
+                <Button
+                  onClick={() => setShowPaymentModal(true)}
+                  size="lg"
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  Proceed to M-Pesa Payment
+                </Button>
               </Card>
             )}
 
-            {currentStep === "confirmation" && (
-              <Card className="p-8 shadow-lg text-center">
-                <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Order Confirmed!</h2>
+            {currentStep === "processing" && (
+              <Card className="p-8 text-center">
+                <div className="mb-6">
+                  <Loader2 className="w-16 h-16 animate-spin text-orange-600 mx-auto" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Processing Payment</h2>
                 <p className="text-gray-600 mb-4">
-                  Your order has been placed successfully.
+                  Please check your phone for the M-Pesa payment prompt. Enter your PIN to complete the transaction.
                 </p>
-                <p className="text-lg font-semibold text-orange-600 mb-6">
-                  Order Number: {orderNumber}
-                </p>
-                <Button
-                  onClick={() => setLocation("/")}
-                  size="lg"
-                  className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 rounded-lg"
-                >
-                  Back to Home
-                </Button>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+                  <p className="text-sm text-blue-900">
+                    <strong>Order Number:</strong> #{orderNumber}
+                  </p>
+                  <p className="text-sm text-blue-900 mt-2">
+                    <strong>Tracking ID:</strong> {trackingId}
+                  </p>
+                </div>
               </Card>
             )}
           </div>
 
-          {/* Order Summary */}
           <div>
-            <Card className="p-6 shadow-lg sticky top-24">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Order Summary</h2>
+            <Card className="p-6 sticky top-4">
+              <h3 className="text-xl font-bold text-gray-800 mb-6">Order Summary</h3>
 
-              <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+              <div className="space-y-3 mb-6 max-h-64 overflow-y-auto">
                 {cartItems.map((item) => {
                   const product = products.get(item.productId);
-                  if (!product) return null;
-
                   return (
-                    <div key={item.productId} className="flex justify-between text-sm pb-4 border-b">
+                    <div key={item.productId} className="flex justify-between text-sm">
                       <div>
-                        <p className="font-semibold text-gray-800">{product.name}</p>
+                        <p className="font-medium text-gray-800">{product?.name || "Product"}</p>
                         <p className="text-gray-600">Qty: {item.quantity}</p>
                       </div>
                       <p className="font-semibold text-gray-800">
-                        {formatPrice(product.price * item.quantity)}
+                        {formatPrice((product?.price || 0) * item.quantity)}
                       </p>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="space-y-4 mb-6 border-t pt-4">
-                <div className="flex justify-between text-gray-600">
-                  <span>Subtotal</span>
-                  <span>{formatPrice(subtotal)}</span>
+              <div className="border-t space-y-3 pt-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span className="font-medium">{formatPrice(subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Shipping</span>
-                  <span>{formatPrice(shippingCost)}</span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Shipping</span>
+                  <span className="font-medium">{formatPrice(shippingCost)}</span>
                 </div>
-                <div className="flex justify-between text-lg font-bold text-gray-800 pt-4 border-t">
-                  <span>Total</span>
-                  <span>{formatPrice(total)}</span>
-                </div>
-              </div>
-
-              {/* Trust Badges */}
-              <div className="space-y-3 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <span>✓</span>
-                  <span>100% Natural Products</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>✓</span>
-                  <span>Fast Delivery Across Kenya</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>✓</span>
-                  <span>Secure M-Pesa Payment</span>
+                <div className="border-t pt-3 flex justify-between">
+                  <span className="font-bold text-gray-800">Total</span>
+                  <span className="text-2xl font-bold text-orange-600">{formatPrice(total)}</span>
                 </div>
               </div>
             </Card>
           </div>
         </div>
       </div>
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        total={total}
+        subtotal={subtotal}
+        shippingCost={shippingCost}
+        orderNumber={orderNumber}
+        onPaymentInitiate={handlePaymentInitiate}
+        isProcessing={isProcessing}
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
+import OrderConfirmation from "./pages/OrderConfirmation";
 import About from "./pages/About";
 import Production from "./pages/Production";
 import Contact from "./pages/Contact";
@@ -25,6 +26,7 @@ function Router() {
       <Route path={"/products"} component={Products} />
       <Route path={"/cart"} component={Cart} />
       <Route path={"/checkout"} component={Checkout} />
+      <Route path={"/order-confirmation"} component={OrderConfirmation} />
       <Route path={"/about"} component={About} />
       <Route path={"/production"} component={Production} />
       <Route path={"/contact"} component={Contact} />
