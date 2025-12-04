@@ -130,7 +130,7 @@ export function PaymentModal({
           {/* Instructions */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
             <p className="text-sm text-blue-900">
-              <strong>Instructions:</strong> After clicking "Send STK Push", you'll receive a payment prompt on your phone. Enter your M-Pesa PIN to complete the payment.
+              <strong>Instructions:</strong> After clicking "Pay", you'll receive a payment prompt on your phone. Enter your M-Pesa PIN to complete the payment.
             </p>
           </div>
 
@@ -155,7 +155,7 @@ export function PaymentModal({
                   Sending...
                 </>
               ) : (
-                "Send STK Push"
+                "Pay"
               )}
             </Button>
           </div>

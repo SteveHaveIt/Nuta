@@ -28,9 +28,23 @@ export interface STKPushResponse {
  */
 export async function initiateSTKPush(payload: STKPushPayload): Promise<STKPushResponse> {
   try {
+    console.log("=== STK PUSH INITIATION ===");
+    console.log("[STK Push] Starting payment initiation...");
+    console.log("[STK Push] Payload:", JSON.stringify(payload, null, 2));
+    
     if (!LIPANA_SECRET_KEY) {
+      console.error("[STK Push] LIPANA_SECRET_KEY not configured");
       throw new Error("LIPANA_SECRET_KEY not configured");
     }
+    
+    if (!LIPANA_PUBLISHABLE_KEY) {
+      console.warn("[STK Push] LIPANA_PUBLISHABLE_KEY not configured (may not be required)");
+    }
+    
+    console.log("[STK Push] API URL:", `${LIPANA_API_URL}/payments/mobile-money/stk-push`);
+    console.log("[STK Push] Phone:", payload.phone_number);
+    console.log("[STK Push] Amount:", payload.amount);
+    console.log("[STK Push] Account Ref:", payload.account_reference);
 
     const response = await axios.post(
       `${LIPANA_API_URL}/payments/mobile-money/stk-push`,
@@ -49,13 +63,28 @@ export async function initiateSTKPush(payload: STKPushPayload): Promise<STKPushR
       }
     );
 
+    console.log("[STK Push] ✅ SUCCESS! Response:", JSON.stringify(response.data, null, 2));
+    console.log("=== STK PUSH COMPLETE ===");
+    
     return {
       success: true,
       message: "STK Push initiated successfully",
       data: response.data,
     };
   } catch (error) {
-    console.error("Lipana STK Push Error:", error);
+    console.error("=== STK PUSH ERROR ===");
+    console.error("[STK Push] ERROR:", error);
+    
+    if (axios.isAxiosError(error)) {
+      console.error("[STK Push] Response data:", JSON.stringify(error.response?.data, null, 2));
+      console.error("[STK Push] Response status:", error.response?.status);
+      console.error("[STK Push] Response headers:", error.response?.headers);
+      console.error("[STK Push] Request URL:", error.config?.url);
+      console.error("[STK Push] Request method:", error.config?.method);
+    }
+    
+    console.error("=== STK PUSH ERROR END ===");
+    
     return {
       success: false,
       message: error instanceof Error ? error.message : "Failed to initiate STK Push",
