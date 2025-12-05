@@ -41,23 +41,31 @@ export async function initiateSTKPush(payload: STKPushPayload): Promise<STKPushR
       console.warn("[STK Push] LIPANA_PUBLISHABLE_KEY not configured (may not be required)");
     }
     
-    console.log("[STK Push] API URL:", `${LIPANA_API_URL}/payments/mobile-money/stk-push`);
+    // Correct endpoint: /transactions/push-stk
+    const endpoint = `${LIPANA_API_URL}/transactions/push-stk`;
+    console.log("[STK Push] API Endpoint:", endpoint);
     console.log("[STK Push] Phone:", payload.phone_number);
     console.log("[STK Push] Amount:", payload.amount);
     console.log("[STK Push] Account Ref:", payload.account_reference);
 
+    // Lipana API expects: phone, amount (and optional callback_url)
+    const requestBody: { phone: string; amount: number; callback_url?: string } = {
+      phone: payload.phone_number,
+      amount: payload.amount,
+    };
+
+    if (payload.callback_url) {
+      requestBody.callback_url = payload.callback_url;
+    }
+
+    console.log("[STK Push] Request body:", JSON.stringify(requestBody, null, 2));
+
     const response = await axios.post(
-      `${LIPANA_API_URL}/payments/mobile-money/stk-push`,
-      {
-        phone_number: payload.phone_number,
-        amount: payload.amount,
-        account_reference: payload.account_reference,
-        transaction_description: payload.transaction_description,
-        callback_url: payload.callback_url,
-      },
+      endpoint,
+      requestBody,
       {
         headers: {
-          Authorization: `Bearer ${LIPANA_SECRET_KEY}`,
+          "x-api-key": LIPANA_SECRET_KEY,
           "Content-Type": "application/json",
         },
       }
@@ -68,8 +76,13 @@ export async function initiateSTKPush(payload: STKPushPayload): Promise<STKPushR
     
     return {
       success: true,
-      message: "STK Push initiated successfully",
-      data: response.data,
+      message: response.data.message || "STK Push initiated successfully",
+      data: {
+        checkout_request_id: response.data.data?.checkoutRequestID || response.data.data?.transactionId,
+        response_code: "0",
+        response_description: response.data.message || "Success",
+        customer_message: response.data.data?.message || "STK push sent to your phone. Please complete the payment on your phone.",
+      },
     };
   } catch (error) {
     console.error("=== STK PUSH ERROR ===");
@@ -81,6 +94,14 @@ export async function initiateSTKPush(payload: STKPushPayload): Promise<STKPushR
       console.error("[STK Push] Response headers:", error.response?.headers);
       console.error("[STK Push] Request URL:", error.config?.url);
       console.error("[STK Push] Request method:", error.config?.method);
+      
+      const errorMessage = error.response?.data?.message || error.message;
+      console.error("=== STK PUSH ERROR END ===");
+      
+      return {
+        success: false,
+        message: errorMessage,
+      };
     }
     
     console.error("=== STK PUSH ERROR END ===");
@@ -102,10 +123,10 @@ export async function queryPaymentStatus(checkoutRequestId: string): Promise<any
     }
 
     const response = await axios.get(
-      `${LIPANA_API_URL}/payments/mobile-money/query/${checkoutRequestId}`,
+      `${LIPANA_API_URL}/transactions/${checkoutRequestId}`,
       {
         headers: {
-          Authorization: `Bearer ${LIPANA_SECRET_KEY}`,
+          "x-api-key": LIPANA_SECRET_KEY,
         },
       }
     );

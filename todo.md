@@ -346,3 +346,15 @@
 - [x] Change button text from "Send STK Push" to "Pay"
 - [x] Added comprehensive logging to payment.ts for debugging
 - [x] Test complete payment flow with real M-Pesa
+
+
+## Phase 13 - Lipana API 404 Error (Complete)
+
+### API Endpoint Issue
+- [x] Research Lipana API documentation
+- [x] Verify correct API endpoint URL
+- [x] Check API version and structure
+- [x] Fix endpoint in payment.ts - Changed from /payments/mobile-money/stk-push to /transactions/push-stk
+- [x] Test STK Push with corrected endpoint
+- [x] Verify API credentials are correct
+- [x] Fixed request body structure to match Lipana API (phone, amount)
