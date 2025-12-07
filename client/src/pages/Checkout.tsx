@@ -167,10 +167,14 @@ export default function Checkout() {
       setTrackingId(`TRK-${orderResponse.orderId}`);
 
       console.log("Initiating STK Push with phone:", phoneNumber);
+      // Convert from cents to KES (divide by 100) before sending to M-Pesa
+      const amountInKES = Math.round(total / 100);
+      console.log("Amount in cents:", total, "Amount in KES:", amountInKES);
+      
       const paymentResponse = await initiatePaymentMutation.mutateAsync({
         orderId: orderResponse.orderId,
         orderNumber: orderResponse.orderNumber,
-        amount: total,
+        amount: amountInKES,
         phoneNumber: phoneNumber,
       });
 
@@ -181,6 +185,7 @@ export default function Checkout() {
         setShowPaymentModal(false);
         toast.success("STK Push sent! Check your phone to complete payment.");
 
+        // Set status to pending - will be updated by webhook when payment completes
         sessionStorage.setItem(
           "lastOrder",
           JSON.stringify({
@@ -191,7 +196,7 @@ export default function Checkout() {
             shippingAddress: shippingForm.shippingAddress,
             customerEmail: shippingForm.customerEmail,
             customerPhone: shippingForm.customerPhone,
-            status: "success",
+            status: "pending",
           })
         );
 

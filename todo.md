@@ -358,3 +358,30 @@
 - [x] Test STK Push with corrected endpoint
 - [x] Verify API credentials are correct
 - [x] Fixed request body structure to match Lipana API (phone, amount)
+
+
+## Phase 14 - Critical Payment Bugs (Complete)
+
+### Bug 1: Amount Multiplied by 100
+- [x] Diagnose why STK Push sends 85,000 instead of 850
+- [x] Check amount calculation in Checkout.tsx
+- [x] Check amount passed to payment API
+- [x] Fix amount to send correct value (not multiplied by 100)
+- [x] Root cause: Prices stored in cents, sent directly to M-Pesa
+- [x] Solution: Divide by 100 before sending (amountInKES = total / 100)
+
+### Bug 2: Success/Failure Messages Reversed
+- [x] Diagnose why thank you page shows on failed payment
+- [x] Check OrderConfirmation page routing logic
+- [x] Check payment status handling in Checkout.tsx
+- [x] Fix routing to show success on successful payment only
+- [x] Root cause: Status set to "success" before payment completes
+- [x] Solution: Changed status to "pending" until payment confirmed
+
+### Bug 3: Checkout Now Duplicates Items
+- [x] Diagnose why Checkout Now adds item before navigating
+- [x] Check ProductDetail.tsx Checkout Now button logic
+- [x] Fix button to navigate directly without adding duplicate
+- [x] Ensure cart count remains correct
+- [x] Root cause: Button always calls addToCart mutation
+- [x] Solution: Navigate directly to checkout without adding

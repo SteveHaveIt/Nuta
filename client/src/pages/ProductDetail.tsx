@@ -330,26 +330,13 @@ export default function ProductDetail() {
             <Button
               size="lg"
               className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg mt-4"
-              onClick={async () => {
+              onClick={() => {
                 if (product) {
-                  const sessionId = getCartSessionId();
-                  try {
-                    await addToCartMutation.mutateAsync({
-                      productId: product.id,
-                      quantity,
-                      sessionId,
-                    });
-                    // Dispatch event to update cart badge
-                    window.dispatchEvent(new CustomEvent("cartUpdated"));
-                    // Navigate to checkout after adding to cart
-                    setLocation("/checkout");
-                  } catch (error) {
-                    console.error("Error adding to cart:", error);
-                    toast.error("Failed to add item to cart");
-                  }
+                  // Navigate directly to checkout - items already in cart from Add to Cart button
+                  setLocation("/checkout");
                 }
               }}
-              disabled={product.stock === 0 || addToCartMutation.isPending}
+              disabled={product.stock === 0}
             >
               🚀 Checkout Now
             </Button>
