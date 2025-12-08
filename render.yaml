@@ -1,0 +1,46 @@
+services:
+  # Backend API Service
+  - type: web
+    name: nuta-ecommerce
+    env: node
+    plan: standard
+    region: singapore
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: VITE_APP_ID
+        value: 787b9744-801b-41ab-8df5-ab9ea5fb573b
+      - key: OAUTH_SERVER_URL
+        value: https://api.manus.im
+      - key: VITE_OAUTH_PORTAL_URL
+        value: https://portal.manus.im
+      - key: OWNER_OPEN_ID
+        sync: false
+      - key: OWNER_NAME
+        value: Steve Have It
+      - key: BUILT_IN_FORGE_API_URL
+        value: https://api.manus.im
+      - key: BUILT_IN_FORGE_API_KEY
+        sync: false
+      - key: VITE_FRONTEND_FORGE_API_URL
+        value: https://api.manus.im
+      - key: VITE_FRONTEND_FORGE_API_KEY
+        sync: false
+      - key: VITE_APP_TITLE
+        value: Nuta - Premium Peanut Butter
+      - key: VITE_APP_LOGO
+        value: /nuta-logo.png
+      - key: LIPANA_PUBLISHABLE_KEY
+        sync: false
+      - key: LIPANA_SECRET_KEY
+        sync: false
+      - key: VITE_ANALYTICS_ENDPOINT
+        sync: false
+      - key: VITE_ANALYTICS_WEBSITE_ID
+        sync: false
