@@ -1,0 +1,63 @@
+# Render.com Deployment Configuration
+# Optimized to prevent timeout issues
+
+services:
+  - type: web
+    name: nuta-ecommerce
+    env: node
+    plan: standard
+    
+    # Build Configuration
+    buildCommand: |
+      echo "Installing dependencies..."
+      pnpm install --frozen-lockfile --prefer-offline
+      echo "Building application..."
+      pnpm build
+      echo "Build complete!"
+    
+    # Start Command
+    startCommand: pnpm start
+    
+    # Environment Variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=2048
+      - key: npm_config_maxsockets
+        value: "5"
+    
+    # Health Check
+    healthCheckPath: /
+    healthCheckInterval: 30
+    
+    # Scaling
+    numInstances: 1
+    autoDeploy: true
+    
+    # Timeout Settings (in seconds)
+    buildTimeout: 3600  # 1 hour
+    deployTimeout: 1800  # 30 minutes
+    
+    # Disk and Memory
+    disk:
+      name: nuta-data
+      mountPath: /var/data
+      sizeGB: 10
+    
+    # Prebuilt Docker Image (optional - faster deployment)
+    # dockerfile: Dockerfile
+    # dockerfilePath: ./Dockerfile
+    
+    # Cron Jobs (optional)
+    # cronJobs:
+    #   - name: publish-scheduled-content
+    #     schedule: "*/5 * * * *"
+    #     command: node scripts/publish-scheduled.mjs
+
+# Database Configuration (if using Render PostgreSQL)
+# databases:
+#   - name: nuta-db
+#     databaseName: nuta_production
+#     user: nuta_user
+#     plan: starter
