@@ -94,9 +94,8 @@ export default function Home() {
               ))
             ) : featuredProducts && featuredProducts.length > 0 ? (
               featuredProducts.map((product) => (
-                <Link key={product.id} href={`/products/${product.slug}`}>
-                  <a className="group">
-                    <Card className="overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
+                <Link key={product.id} href={`/products/${product.slug}`} className="group">
+                  <Card className="overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
                       {/* Product Image */}
                       <div className="relative h-48 bg-secondary overflow-hidden">
                         <img
@@ -145,7 +144,6 @@ export default function Home() {
                         </Button>
                       </div>
                     </Card>
-                  </a>
                 </Link>
               ))
             ) : (
